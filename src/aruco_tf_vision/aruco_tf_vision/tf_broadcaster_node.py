@@ -14,6 +14,7 @@ TF 坐标变换广播节点（aruco_tf_vision 包）
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 from geometry_msgs.msg import PoseStamped
 from tf2_ros import TransformBroadcaster
 from tf2_ros.transform_broadcaster import TransformStamped
@@ -59,12 +60,16 @@ class TFBroadcasterNode(Node):
         # 如果没有 MAVROS 数据，可以发布静态 TF
         self.timer = self.create_timer(1.0 / self.publish_rate, self.timer_callback)
 
-        # ========== 2Hz 日志定时器 ==========
-        self.log_timer = self.create_timer(0.5, self.log_callback)
+        # ========== 1Hz 日志定时器 ==========
+        self.log_timer = self.create_timer(1.0, self.log_callback)
 
         # ========== 存储最新位姿 ==========
         self.latest_pose = None
         self.latest_pose_log = ""  # 存储最新位姿用于日志
+        self.latest_yaw_rad = 0.0
+        self.latest_yaw_deg = 0.0
+        self.initial_yaw_rad = 0.0
+        self.initial_yaw_set = False
 
         self.get_logger().info('TF Broadcaster 节点已启动')
         self.get_logger().info(f'  - 父坐标系：{self.frame_id}')
@@ -79,7 +84,23 @@ class TFBroadcasterNode(Node):
             msg: PoseStamped 消息，包含无人机在 ENU 坐标系下的位置和姿态
         """
         self.latest_pose = msg
-        self.get_logger().debug(f'收到位姿数据：x={msg.pose.position.x:.3f}, y={msg.pose.position.y:.3f}, z={msg.pose.position.z:.3f}')
+        qx = msg.pose.orientation.x
+        qy = msg.pose.orientation.y
+        qz = msg.pose.orientation.z
+        qw = msg.pose.orientation.w
+        # 四元数转 yaw（绕 Z 轴）
+        siny_cosp = 2.0 * (qw * qz + qx * qy)
+        cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+        raw_yaw_rad = math.atan2(siny_cosp, cosy_cosp)
+
+        # 首次接收的 yaw 作为零点偏移，后续输出相对 yaw（范围 [-pi, pi]）
+        if not self.initial_yaw_set:
+            self.initial_yaw_rad = raw_yaw_rad
+            self.initial_yaw_set = True
+
+        relative_yaw_rad = raw_yaw_rad - self.initial_yaw_rad
+        self.latest_yaw_rad = math.atan2(math.sin(relative_yaw_rad), math.cos(relative_yaw_rad))
+        self.latest_yaw_deg = math.degrees(self.latest_yaw_rad)
 
     def timer_callback(self):
         """
@@ -107,11 +128,12 @@ class TFBroadcasterNode(Node):
             # 姿态（四元数）
             transform_stamped.transform.rotation = self.latest_pose.pose.orientation
 
-            # 存储位姿用于日志（2Hz）
+            # 存储位姿用于日志（1Hz）
             self.latest_pose_log = (
                 f'发布 TF: x={self.latest_pose.pose.position.x:.3f}, '
                 f'y={self.latest_pose.pose.position.y:.3f}, '
-                f'z={self.latest_pose.pose.position.z:.3f}'
+                f'z={self.latest_pose.pose.position.z:.3f}, '
+                f'yaw={self.latest_yaw_rad:.3f} rad ({self.latest_yaw_deg:.1f} deg)'
             )
         else:
             # ========== 无数据时发布静态 TF ==========
@@ -133,7 +155,7 @@ class TFBroadcasterNode(Node):
         self.tf_broadcaster.sendTransform(transform_stamped)
 
     def log_callback(self):
-        """2Hz 日志回调函数"""
+        """1Hz 日志回调函数"""
         if self.latest_pose_log:
             self.get_logger().info(self.latest_pose_log)
 
@@ -144,11 +166,12 @@ def main(args=None):
     node = TFBroadcasterNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

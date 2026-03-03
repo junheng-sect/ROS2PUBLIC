@@ -13,10 +13,13 @@ import os
 def generate_launch_description():
     # ========== 配置区域（根据成功的 gazebo_image_test 配置）==========
     # Gazebo 图像话题（已验证正确的话题）
-    gz_image_topic = '/world/baylands/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
+    gz_image_topic = '/world/aruco/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
     
-    # ROS 话题名称
+    # ROS 话题名称（用于可视化和通用命名）
     ros_image_topic = '/camera/image_raw'
+    # 说明：当前 parameter_bridge 日志显示其 ROS 侧最终话题名为 gz_image_topic，
+    # 因此检测节点直接订阅 bridge 实际输出话题，避免因 remap 未生效导致无图像。
+    detector_input_topic = gz_image_topic
     
     # 相机内参（根据实际相机分辨率调整）
     # 如果分辨率是 640x480，hfov=1.74 rad：
@@ -50,7 +53,7 @@ def generate_launch_description():
             name='aruco_gazebo',
             output='screen',
             parameters=[{
-                'image_topic': ros_image_topic,  # 订阅桥接后的话题
+                'image_topic': detector_input_topic,  # 订阅 bridge 实际输出话题
                 'use_compressed': False,         # Gazebo 发布原始图像
                 'publish_annotated_image': True,
                 

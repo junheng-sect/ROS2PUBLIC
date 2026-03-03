@@ -343,7 +343,9 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # launch 退出时可能已由其他路径触发 shutdown，避免重复关闭异常
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

@@ -16,6 +16,8 @@ ArUco 检测节点（aruco_tf_vision 包）
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CompressedImage
+from geometry_msgs.msg import PoseStamped
+from mavros_msgs.msg import State
 from aruco_interfaces.msg import ArucoPose
 from cv_bridge import CvBridge
 import cv2
@@ -26,6 +28,8 @@ from geometry_msgs.msg import TransformStamped
 import tf2_ros
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 import os
+import csv
+from datetime import datetime
 
 
 class ArucoDetectorNode(Node):
@@ -61,6 +65,12 @@ class ArucoDetectorNode(Node):
         self.declare_parameter('vision_offset_x', 0.0)
         self.declare_parameter('vision_offset_y', 0.0)
         self.declare_parameter('vision_offset_z', 0.0)
+        # CSV 日志参数
+        self.declare_parameter('enable_csv_log', True)
+        self.declare_parameter(
+            'csv_log_path',
+            os.path.expanduser('~/project/project_ws/src/aruco_tf_vision/aruco_log/aruco_tf_vision_log.csv')
+        )
 
         # ========== 获取参数 ==========
         self.image_topic = self.get_parameter('image_topic').value
@@ -81,10 +91,19 @@ class ArucoDetectorNode(Node):
         self.vision_offset_x = self.get_parameter('vision_offset_x').value
         self.vision_offset_y = self.get_parameter('vision_offset_y').value
         self.vision_offset_z = self.get_parameter('vision_offset_z').value
+        self.enable_csv_log = self.get_parameter('enable_csv_log').value
+        self.csv_path = self.get_parameter('csv_log_path').value
 
         self.current_marker_id = 33
         self.marker_lengths = {33: 0.5, 42: 0.063}
         self.default_marker_size = 0.05
+        self.latest_marker_yaw_deg = None
+        self.latest_tvec = None
+        self.latest_base_pose = None
+        self.latest_vision_pose = None
+        self.latest_mode = ""
+        self.csv_file = None
+        self.csv_writer = None
 
         # ========== 订阅话题 ==========
         self.subscribe_topic = f'{self.image_topic}/compressed' if self.use_compressed else self.image_topic
@@ -95,6 +114,18 @@ class ArucoDetectorNode(Node):
             self.subscribe_topic,
             self.listener_callback,
             qos
+        )
+        self.base_pose_sub = self.create_subscription(
+            PoseStamped,
+            '/mavros/local_position/pose',
+            self.base_pose_callback,
+            qos
+        )
+        self.state_sub = self.create_subscription(
+            State,
+            '/mavros/state',
+            self.state_callback,
+            10
         )
 
         # ========== 发布者 ==========
@@ -130,8 +161,10 @@ class ArucoDetectorNode(Node):
         self.frame_count = 0
         self.detect_count = 0
         self.latest_detection_log = ""  # 存储最新的检测结果用于日志
-        # 2Hz 日志定时器
-        self.log_timer = self.create_timer(0.5, self.log_callback)
+        self.latest_tvec_log = ""       # 存储最新的 tvec 三轴值用于 1Hz 日志
+        # 1Hz 日志定时器
+        self.log_timer = self.create_timer(1.0, self.log_callback)
+        self._init_csv_log()
 
         # ========== 初始化日志 ==========
         self.get_logger().info(f'ArUco Detector Node started | Sub: {self.subscribe_topic}')
@@ -234,11 +267,20 @@ class ArucoDetectorNode(Node):
                 # 在 map 坐标系中，vision_pose = -aruco_pose（因为 ArUco 位姿是相机→标记）
                 self._publish_vision_tf(t, q, marker_id)
 
-                # 存储检测结果用于日志（2Hz）
+                # 存储检测结果用于日志（1Hz）
                 self.latest_detection_log = (
                     f'ID {marker_id}: '
                     f'X={t[0]:.3f} Y={t[1]:.3f} Z={t[2]:.3f} '
                     f'Yaw={np.degrees(yaw):.1f}°'
+                )
+                self.latest_marker_yaw_deg = float(np.degrees(yaw))
+                self.latest_tvec = (
+                    float(t[0]),
+                    float(t[1]),
+                    float(t[2]),
+                )
+                self.latest_tvec_log = (
+                    f'tvec[0]={t[0]:.3f}, tvec[1]={t[1]:.3f}, tvec[2]={t[2]:.3f}'
                 )
                 self.detect_count += 1
                 detected = True
@@ -273,9 +315,107 @@ class ArucoDetectorNode(Node):
                 self.get_logger().error(f'Publish image failed: {e}')
 
     def log_callback(self):
-        """2Hz 日志回调函数"""
+        """1Hz 日志回调函数"""
         if self.latest_detection_log:
             self.get_logger().info(self.latest_detection_log)
+            self.get_logger().info(self.latest_tvec_log)
+        self._write_csv_row()
+
+    def state_callback(self, msg: State):
+        self.latest_mode = msg.mode
+
+    def base_pose_callback(self, msg: PoseStamped):
+        q = msg.pose.orientation
+        yaw = self._quat_to_yaw(q.x, q.y, q.z, q.w)
+        self.latest_base_pose = {
+            'x': float(msg.pose.position.x),
+            'y': float(msg.pose.position.y),
+            'z': float(msg.pose.position.z),
+            'yaw_deg': float(np.degrees(yaw))
+        }
+
+    @staticmethod
+    def _quat_to_yaw(qx, qy, qz, qw):
+        siny_cosp = 2.0 * (qw * qz + qx * qy)
+        cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+        return np.arctan2(siny_cosp, cosy_cosp)
+
+    def _init_csv_log(self):
+        if not self.enable_csv_log:
+            return
+        try:
+            base_path = self.csv_path
+            dir_name = os.path.dirname(base_path)
+            file_name = os.path.basename(base_path)
+            name, ext = os.path.splitext(file_name)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            with_ts = f"{name}_{timestamp}{ext}"
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
+                self.csv_path = os.path.join(dir_name, with_ts)
+            else:
+                self.csv_path = with_ts
+
+            self.csv_file = open(self.csv_path, mode='w', newline='')
+            self.csv_writer = csv.writer(self.csv_file)
+            self.csv_writer.writerow([
+                'timestamp',
+                'stage',
+                'base_x',
+                'base_y',
+                'base_z',
+                'base_yaw_deg',
+                'vision_x',
+                'vision_y',
+                'vision_z',
+                'vision_yaw_deg',
+                'detector_yaw_deg',
+                'tvec_x',
+                'tvec_y',
+                'tvec_z',
+            ])
+            self.get_logger().info(f'CSV 日志文件已创建：{self.csv_path}')
+        except Exception as e:
+            self.get_logger().error(f'CSV 初始化失败: {e}')
+            self.enable_csv_log = False
+
+    def _write_csv_row(self):
+        if not self.enable_csv_log or self.csv_writer is None:
+            return
+        base = self.latest_base_pose
+        vision = self.latest_vision_pose
+        stage = 'NO_BASE'
+        if base is not None and vision is None:
+            stage = 'NO_VISION'
+        elif base is not None and vision is not None:
+            stage = self.latest_mode if self.latest_mode else 'TRACKING'
+
+        def _fmt(obj, key):
+            if obj is None:
+                return ''
+            return f'{obj[key]:.6f}'
+
+        marker_yaw = '' if self.latest_marker_yaw_deg is None else f'{self.latest_marker_yaw_deg:.6f}'
+        tvec_x = '' if self.latest_tvec is None else f'{self.latest_tvec[0]:.6f}'
+        tvec_y = '' if self.latest_tvec is None else f'{self.latest_tvec[1]:.6f}'
+        tvec_z = '' if self.latest_tvec is None else f'{self.latest_tvec[2]:.6f}'
+        self.csv_writer.writerow([
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
+            stage,
+            _fmt(base, 'x'),
+            _fmt(base, 'y'),
+            _fmt(base, 'z'),
+            _fmt(base, 'yaw_deg'),
+            _fmt(vision, 'x'),
+            _fmt(vision, 'y'),
+            _fmt(vision, 'z'),
+            _fmt(vision, 'yaw_deg'),
+            marker_yaw,
+            tvec_x,
+            tvec_y,
+            tvec_z,
+        ])
+        self.csv_file.flush()
 
     def _publish_vision_tf(self, tvec, quat, mid):
         """
@@ -293,15 +433,6 @@ class ArucoDetectorNode(Node):
         t.header.frame_id = self.world_frame  # map
         t.child_frame_id = self.vision_frame  # vision_pose
 
-        # ========== 位置计算 ==========
-        # 坐标轴修正：
-        # - X: 取反（相机向前飞，tvec[0] 为负，vision_pose 需向前）
-        # - Y: 不取反（方向正确）
-        # - Z: 不取反（方向正确）
-        t.transform.translation.x = -tvec[0] + self.vision_offset_x
-        t.transform.translation.y = tvec[1] + self.vision_offset_y
-        t.transform.translation.z = tvec[2] + self.vision_offset_z
-
         # ========== 旋转修正 ==========
         # 1. Z 轴修正（绕 X 轴 180°）
         corrected_quat = quaternion_multiply(self.z_axis_correction, quat)
@@ -314,16 +445,44 @@ class ArucoDetectorNode(Node):
             corrected_quat[3]
         ])
 
-        # 3. 绕 Z 轴旋转 +90° 修正
+        # 3. 绕自身 Z 轴旋转 +90° 修正（右乘：局部坐标系）
         z_90_quat = np.array([0.0, 0.0, 0.7071067811865476, 0.7071067811865476])
-        final_quat = quaternion_multiply(z_90_quat, inv_quat)
+        final_quat = quaternion_multiply(inv_quat, z_90_quat)
+
+        # ========== 位置计算（与 yaw 耦合）==========
+        # theta 取 vision_pose 的 yaw 角（度）并转弧度，用于平移旋转补偿
+        yaw_rad = self._quat_to_yaw(
+            final_quat[0],
+            final_quat[1],
+            final_quat[2],
+            final_quat[3]
+        )
+        yaw_deg = float(np.degrees(yaw_rad))
+        theta = np.deg2rad(yaw_deg)
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
+        t.transform.translation.x = -tvec[0] * sin_theta + tvec[1] * cos_theta + self.vision_offset_x
+        t.transform.translation.y = tvec[0] * cos_theta + tvec[1] * sin_theta + self.vision_offset_y
+        t.transform.translation.z = tvec[2] + self.vision_offset_z
 
         t.transform.rotation.x = final_quat[0]
         t.transform.rotation.y = final_quat[1]
         t.transform.rotation.z = final_quat[2]
         t.transform.rotation.w = final_quat[3]
+        self.latest_vision_pose = {
+            'x': float(t.transform.translation.x),
+            'y': float(t.transform.translation.y),
+            'z': float(t.transform.translation.z),
+            'yaw_deg': yaw_deg
+        }
 
         self.tf_broadcaster.sendTransform(t)
+
+    def destroy_node(self):
+        if self.csv_file:
+            self.csv_file.close()
+            self.csv_file = None
+        super().destroy_node()
 
 
 def main(args=None):

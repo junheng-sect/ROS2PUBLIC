@@ -114,3 +114,5 @@ ros2 topic hz /camera/image_raw
 - 2026-03-03：完成仓库初始化后的基础整理：分支由 `master` 调整为 `main`，新增 `.gitignore`（忽略 `build/install/log`、IDE 与缓存文件）。
 - 2026-03-03：完成首个提交（commit: `043cd45`），绑定远程仓库 `origin=https://github.com/junheng-sect/junhengWS.git`；推送阶段因 GitHub 凭据未配置而中断。
 - 2026-03-03：按 HTTPS 方案配置 `git credential.helper=store`，等待提供 GitHub PAT 后继续执行 `git push -u origin main`。
+- 2026-03-03：使用 PAT 执行 `git push -u origin main` 返回 403（`Write access to repository not granted`），需确认令牌权限或仓库写权限后重试。
+- 2026-03-03：按要求切换远程到 `https://github.com/junheng-sect/ROS2PUBLIC.git` 并推送；GitHub 返回 403（当前凭据对该仓库无写权限）。

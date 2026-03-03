@@ -1,0 +1,173 @@
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from aruco_interfaces.msg import ArucoPose
+from cv_bridge import CvBridge
+import cv2
+import cv2.aruco as aruco
+import numpy as np
+from tf_transformations import euler_from_quaternion
+from geometry_msgs.msg import TransformStamped
+import tf2_ros
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+
+class ArucoDetectorNode(Node):
+    def __init__(self):
+        super().__init__('aruco_detector')
+
+        # --- 声明参数（话题名可运行时指定）---
+        self.declare_parameter('image_topic', '/image_raw')
+        image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
+
+        # --- 创建订阅者（使用兼容 QoS）---
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        
+        self.subscription = self.create_subscription(
+            Image,
+            image_topic, 
+            self.listener_callback,
+            qos_profile)
+        
+        self.publisher_ = self.create_publisher(ArucoPose, '/aruco_pose', 10)
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+        self.bridge = CvBridge()
+
+        # ========== 使用你的真实相机参数 ==========
+        self.camera_matrix = np.array([
+            [805.774046,  0.0,       361.796544],
+            [0.0,         803.781058, 266.585774],
+            [0.0,         0.0,        1.0       ]
+        ], dtype=np.float32)
+
+        self.dist_coeffs = np.array([
+            [-0.456468, 0.232455, -0.003693, -0.006061, 0.000000]
+        ], dtype=np.float32)
+
+        # ========== 使用你的 ArUco 配置 ==========
+        self.dictionary = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)
+        
+        try:
+            self.parameters = aruco.DetectorParameters()
+            self.detector = aruco.ArucoDetector(self.dictionary, self.parameters)
+            self.use_new_api = True
+        except AttributeError:
+            self.parameters = aruco.DetectorParameters_create()
+            self.use_new_api = False
+
+        # 标记尺寸（根据你的代码）
+        self.marker_lengths = {
+            33: 0.188,   # 外层码
+            42: 0.0248,  # 内层码
+        }
+        self.default_marker_size = 0.05  # 默认值
+
+        self.get_logger().info(f'ArUco Detector started, subscribing to: {image_topic}')
+
+    def listener_callback(self, msg):
+        # 调试日志：确认收到图像
+        self.get_logger().debug(f'Received image: {msg.width}x{msg.height}')
+        
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except Exception as e:
+            self.get_logger().error(f"CV Bridge error: {e}")
+            return
+
+        # 检测 ArUco
+        if self.use_new_api:
+            corners, ids, rejected = self.detector.detectMarkers(cv_image)
+        else:
+            corners, ids, rejected = aruco.detectMarkers(
+                cv_image, self.dictionary, parameters=self.parameters)
+
+        if ids is not None:
+            detected_ids = ids.flatten().tolist()
+            
+            # 优先选择 ID 33，否则选 42（与你的成功代码逻辑一致）
+            selected_id = None
+            selected_corners = None
+            selected_marker_length = None
+
+            if 33 in detected_ids:
+                idx = detected_ids.index(33)
+                selected_id = 33
+                selected_corners = corners[idx]
+                selected_marker_length = self.marker_lengths[33]
+            elif 42 in detected_ids:
+                idx = detected_ids.index(42)
+                selected_id = 42
+                selected_corners = corners[idx]
+                selected_marker_length = self.marker_lengths[42]
+
+            if selected_id is not None:
+                # 估计位姿
+                rvec, tvec, _ = aruco.estimatePoseSingleMarkers(
+                    selected_corners, 
+                    selected_marker_length, 
+                    self.camera_matrix, 
+                    self.dist_coeffs)
+
+                r = rvec[0][0]
+                t = tvec[0][0]
+
+                # 旋转向量转欧拉角
+                R, _ = cv2.Rodrigues(r)
+                q = self.rotation_matrix_to_quaternion(R)
+                euler = euler_from_quaternion(q)
+
+                # 发布消息
+                pose_msg = ArucoPose()
+                pose_msg.id = int(selected_id)
+                pose_msg.x = float(t[0])
+                pose_msg.y = float(t[1])
+                pose_msg.z = float(t[2])
+                pose_msg.roll = float(euler[0])
+                pose_msg.pitch = float(euler[1])
+                pose_msg.yaw = float(euler[2])
+
+                self.publisher_.publish(pose_msg)
+                
+                # 绘制
+                cv2.aruco.drawDetectedMarkers(cv_image, corners, ids)
+                cv2.aruco.drawAxis(cv_image, self.camera_matrix, self.dist_coeffs, r, t, selected_marker_length * 0.5)
+                
+                self.publish_tf(t, q, selected_id)
+
+                # 打印位姿（与你的成功代码格式一致）
+                yaw_deg = np.degrees(euler[2])
+                self.get_logger().info(
+                    f'📍 ID {selected_id}: X={t[0]:.3f}m, Y={t[1]:.3f}m, Z={t[2]:.3f}m, Yaw={yaw_deg:6.2f}°'
+                )
+
+    def rotation_matrix_to_quaternion(self, R):
+        import tf_transformations as tf
+        return tf.quaternion_from_matrix(np.vstack((np.hstack((R, [[0],[0],[0]])), [0,0,0,1])))
+
+    def publish_tf(self, tvec, quat, marker_id):
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "camera_link"
+        t.child_frame_id = f"aruco_marker_{marker_id}"
+        t.transform.translation.x = tvec[0]
+        t.transform.translation.y = tvec[1]
+        t.transform.translation.z = tvec[2]
+        t.transform.rotation.x = quat[0]
+        t.transform.rotation.y = quat[1]
+        t.transform.rotation.z = quat[2]
+        t.transform.rotation.w = quat[3]
+        self.tf_broadcaster.sendTransform(t)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ArucoDetectorNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

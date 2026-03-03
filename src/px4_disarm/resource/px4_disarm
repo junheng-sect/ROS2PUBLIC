@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package format="3">
+  <name>px4_disarm</name>
+  <version>0.0.1</version>
+  <description>PX4 Disarm Service Node</description>
+  <maintainer email="zjh@todo.todo">zjh</maintainer>
+  <license>Apache-2.0</license>
+</package>

@@ -116,3 +116,4 @@ ros2 topic hz /camera/image_raw
 - 2026-03-03：按 HTTPS 方案配置 `git credential.helper=store`，等待提供 GitHub PAT 后继续执行 `git push -u origin main`。
 - 2026-03-03：使用 PAT 执行 `git push -u origin main` 返回 403（`Write access to repository not granted`），需确认令牌权限或仓库写权限后重试。
 - 2026-03-03：按要求切换远程到 `https://github.com/junheng-sect/ROS2PUBLIC.git` 并推送；GitHub 返回 403（当前凭据对该仓库无写权限）。
+- 2026-03-03：使用具备写权限的 PAT 完成认证；处理远程非 fast-forward（`git pull --rebase origin main`）后，成功推送 `main` 到 `ROS2PUBLIC`。

@@ -112,3 +112,5 @@ ros2 topic hz /camera/image_raw
 - 2026-03-03：新增“代理人设与技术栈”“协作与记录要求”“开发规范”章节，写入默认工作空间与文档维护规则。
 - 2026-03-03：配置 Git 全局撤销别名（`undo`、`unstage`、`discard`、`last`），用于快速撤销工作区/暂存区改动。
 - 2026-03-03：完成仓库初始化后的基础整理：分支由 `master` 调整为 `main`，新增 `.gitignore`（忽略 `build/install/log`、IDE 与缓存文件）。
+- 2026-03-03：完成首个提交（commit: `043cd45`），绑定远程仓库 `origin=https://github.com/junheng-sect/junhengWS.git`；推送阶段因 GitHub 凭据未配置而中断。
+- 2026-03-03：按 HTTPS 方案配置 `git credential.helper=store`，等待提供 GitHub PAT 后继续执行 `git push -u origin main`。

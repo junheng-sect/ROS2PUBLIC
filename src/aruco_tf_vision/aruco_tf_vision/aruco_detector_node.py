@@ -162,6 +162,7 @@ class ArucoDetectorNode(Node):
         self.detect_count = 0
         self.latest_detection_log = ""  # 存储最新的检测结果用于日志
         self.latest_tvec_log = ""       # 存储最新的 tvec 三轴值用于 1Hz 日志
+        self.latest_theta_log = ""      # 存储最新的 theta 用于 1Hz 日志
         # 1Hz 日志定时器
         self.log_timer = self.create_timer(1.0, self.log_callback)
         self._init_csv_log()
@@ -319,6 +320,7 @@ class ArucoDetectorNode(Node):
         if self.latest_detection_log:
             self.get_logger().info(self.latest_detection_log)
             self.get_logger().info(self.latest_tvec_log)
+            self.get_logger().info(self.latest_theta_log)
         self._write_csv_row()
 
     def state_callback(self, msg: State):
@@ -339,6 +341,11 @@ class ArucoDetectorNode(Node):
         siny_cosp = 2.0 * (qw * qz + qx * qy)
         cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
         return np.arctan2(siny_cosp, cosy_cosp)
+
+    @staticmethod
+    def _normalize_deg(deg):
+        """将角度归一化到 [-180, 180]（度）"""
+        return ((deg + 180.0) % 360.0) - 180.0
 
     def _init_csv_log(self):
         if not self.enable_csv_log:
@@ -459,6 +466,11 @@ class ArucoDetectorNode(Node):
         )
         yaw_deg = float(np.degrees(yaw_rad))
         theta = np.deg2rad(yaw_deg)
+        yaw_aruco_deg = self._normalize_deg(yaw_deg - 90.0)
+        self.latest_theta_log = (
+            f'theta={theta:.6f} rad ({yaw_deg:.2f} deg), '
+            f'yaw_aruco={yaw_aruco_deg:.2f} deg'
+        )
         cos_theta = np.cos(theta)
         sin_theta = np.sin(theta)
         t.transform.translation.x = -tvec[0] * sin_theta + tvec[1] * cos_theta + self.vision_offset_x

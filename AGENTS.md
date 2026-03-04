@@ -17,7 +17,7 @@
 - 每次创建功能包后，生成对应 `readme.md`。
 - 在本 `AGENTS.md` 中持续记录每次进行的修改。
 - 每完成一轮对话，更新一次本文件的“修改记录”。
-- 功能包测试完成后，仅在你明确回复“成功”后执行 Git 提交。
+- 功能包测试完成后，仅在你明确回复“成功”后执行 Git 提交并上传远程仓库。
 - 每次我修改代码后，自动执行 `colcon build` 并执行 `source install/setup.bash`。
 - 每次涉及 launch 的修改后，自动运行对应 `ros2 launch` 进行验证；确认启动成功后再停止。
 
@@ -26,6 +26,11 @@
 - 默认使用 `ament-python` 创建功能包。
 - 使用 `ament_cmake` 时需说明原因。
 - 协议默认使用 **Apache-2.0**。
+
+## Git 分支策略
+
+- `main`：用于 `Ubuntu 24.04 + ROS 2 Jazzy` 的日常程序开发与功能迭代。
+- `ubuntu22.04-ros-humble`：用于 `Ubuntu 22.04 + ROS 2 Humble` 的版本适配与实机实验验证。
 
 ## 项目概述
 
@@ -158,3 +163,8 @@ ros2 topic hz /camera/image_raw
 - 2026-03-03：根据要求对调 `map->vision_pose` 平移公式中的 XY 赋值（交换 X/Y 两行公式）。
 - 2026-03-03：继续调整 `map->vision_pose` 平移公式：在对调后的基础上将 `Y` 分量整体取反。
 - 2026-03-03：用户确认“成功”后，按约定执行本轮 Git 提交流程（仅纳入代码与文档变更，排除运行期 CSV 日志文件）。
+- 2026-03-04：新增“Git 分支策略”章节，明确 `main`（Ubuntu 24.04 + ROS 2 Jazzy 开发）与 `ubuntu22.04-ros-humble`（Ubuntu 22.04 + ROS 2 Humble 适配与实机）职责划分。
+- 2026-03-04：修改 `aruco_position_controller` 的视觉位姿来源：由订阅 `/aruco_pose` 改为直接查询 TF `map->vision_pose`（tf2），使控制输入与 `aruco_tf_vision` 的最终坐标变换保持一致；同时在 `package.xml` 增加 `tf2_ros` 依赖。
+- 2026-03-04：修复 `aruco_position_controller` 退出流程，兼容 `ExternalShutdownException` 并避免重复 `rclpy.shutdown()` 报错（短时运行测试通过）。
+- 2026-03-04：修复 `aruco_position_controller` 左右方向控制发散：`/mavros/setpoint_velocity/cmd_vel` 的 `linear.y` 改为 `-vy`，与当前机体系/控制方向一致。
+- 2026-03-04：按联调反馈继续修正 `aruco_position_controller` 速度映射：`/mavros/setpoint_velocity/cmd_vel` 的 `linear.x` 与 `linear.y` 均调整为直接使用 PID 输出（等效相对上一版两轴同时取反）。

@@ -14,7 +14,7 @@ TF Tree:
         └── vision_pose (ArUco 视觉估计)
 
 控制逻辑：
-- 订阅 /aruco_pose 获取视觉位姿
+- 查询 TF (map -> vision_pose) 获取视觉位姿
 - 目标位置：map 坐标系原点 (0, 0)
 - 通过 PID 计算速度指令，发布到 /mavros/setpoint_velocity/cmd_vel
 - 进入 Offboard 模式后自动启用对齐控制
@@ -23,14 +23,16 @@ TF Tree:
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 # 消息类型导入
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 from std_msgs.msg import Header
-from aruco_interfaces.msg import ArucoPose
 from std_srvs.srv import SetBool
+from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
+from rclpy.duration import Duration
 
 import time
 
@@ -112,6 +114,10 @@ class ArucoPositionControlNode(Node):
         
         # 是否启用视觉对齐（否则使用位置控制）
         self.declare_parameter('use_vision_alignment', True)
+        # TF 坐标系参数（视觉位姿）
+        self.declare_parameter('world_frame', 'map')
+        self.declare_parameter('vision_frame', 'vision_pose')
+        self.declare_parameter('tf_lookup_timeout', 0.05)
         
         # 进入 Offboard 后是否自动启用控制
         self.declare_parameter('auto_enable_offboard', True)
@@ -135,6 +141,9 @@ class ArucoPositionControlNode(Node):
         self.align_threshold_z = self.get_parameter('align_threshold_z').value
         self.enable_z_control = self.get_parameter('enable_z_control').value
         self.use_vision_alignment = self.get_parameter('use_vision_alignment').value
+        self.world_frame = self.get_parameter('world_frame').value
+        self.vision_frame = self.get_parameter('vision_frame').value
+        self.tf_lookup_timeout = self.get_parameter('tf_lookup_timeout').value
         self.auto_enable_offboard = self.get_parameter('auto_enable_offboard').value
         self.velocity_deadband = self.get_parameter('velocity_deadband').value
         
@@ -164,8 +173,8 @@ class ArucoPositionControlNode(Node):
         self.control_enabled = False  # 是否启用控制
         self.prev_offboard_mode = False  # 记录上一次是否为 Offboard 模式
         
-        # ArUco 检测时间戳（用于超时判断）
-        self.last_aruco_time = None  # 最后一次检测到 ArUco 的时间
+        # 视觉 TF 时间戳（用于超时判断）
+        self.last_vision_time = None  # 最后一次成功查询 map->vision_pose 的时间
         
         # 进入 Offboard 的时间（用于初始悬停）
         self.offboard_enter_time = None  # 进入 Offboard 的时刻
@@ -183,10 +192,9 @@ class ArucoPositionControlNode(Node):
         self.state_sub = self.create_subscription(
             State, '/mavros/state', self.state_callback, 10
         )
-        # ArUco 位姿（vision_pose 位置）
-        self.vision_sub = self.create_subscription(
-            ArucoPose, '/aruco_pose', self.vision_callback, qos_profile
-        )
+        # TF 监听器：读取 map->vision_pose（与 aruco_tf_vision 结果保持一致）
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # ========== 发布者 ==========
         # 速度控制指令
@@ -240,18 +248,25 @@ class ArucoPositionControlNode(Node):
         
         self.prev_offboard_mode = (msg.mode == "OFFBOARD")
 
-    def vision_callback(self, msg: ArucoPose):
+    def update_vision_from_tf(self):
         """
-        接收 ArUco 检测的 vision_pose 位置
-        vision_pose 表示基于 ArUco 视觉估计的无人机在 map 坐标系中的位姿
+        从 TF 查询 map->vision_pose，并更新 vision_pos。
         """
-        # 更新 ArUco 检测时间戳
-        self.last_aruco_time = self.get_clock().now()
-        
-        self.vision_pos['x'] = msg.x
-        self.vision_pos['y'] = msg.y
-        self.vision_pos['z'] = msg.z
-        # has_vision_pos 在 timer 中根据超时判断更新
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.world_frame,
+                self.vision_frame,
+                rclpy.time.Time(),
+                timeout=Duration(seconds=self.tf_lookup_timeout)
+            )
+        except (LookupException, ConnectivityException, ExtrapolationException):
+            return False
+
+        self.vision_pos['x'] = float(transform.transform.translation.x)
+        self.vision_pos['y'] = float(transform.transform.translation.y)
+        self.vision_pos['z'] = float(transform.transform.translation.z)
+        self.last_vision_time = self.get_clock().now()
+        return True
 
     def enable_callback(self, request, response):
         """
@@ -324,18 +339,19 @@ class ArucoPositionControlNode(Node):
                 self.offboard_enter_time = None
                 self.get_logger().info('Initial hover done, starting alignment control')
 
-        # ========== 检查 ArUco 检测状态（超时判断） ==========
+        # ========== 检查视觉 TF 状态（超时判断） ==========
+        self.update_vision_from_tf()
         current_time = self.get_clock().now()
-        if self.last_aruco_time is not None:
-            elapsed = (current_time - self.last_aruco_time).nanoseconds / 1e9
+        if self.last_vision_time is not None:
+            elapsed = (current_time - self.last_vision_time).nanoseconds / 1e9
             if elapsed > self.aruco_timeout:
-                # 超过超时时间未检测到 ArUco
+                # 超过超时时间未查询到有效 vision_pose
                 self.has_vision_pos = False
             else:
                 # 在超时时间内，认为有有效数据
                 self.has_vision_pos = True
         else:
-            # 从未检测到 ArUco
+            # 从未查询到有效 vision_pose
             self.has_vision_pos = False
 
         # ========== 计算控制量 ==========
@@ -382,7 +398,9 @@ class ArucoPositionControlNode(Node):
         else:
             # 没有视觉数据，保持悬停
             vx, vy, vz = 0.0, 0.0, 0.0
-            self.latest_log = 'No ArUco detected, hovering...'
+            self.latest_log = (
+                f'No vision TF ({self.world_frame}->{self.vision_frame}), hovering...'
+            )
 
         # ========== 发布速度指令 ==========
         self.publish_velocity(vx, vy, vz)
@@ -394,16 +412,16 @@ class ArucoPositionControlNode(Node):
         坐标系说明：
         - vision_pose 基于 ArUco 检测，使用 ENU 坐标系
         - MAVROS /mavros/setpoint_velocity/cmd_vel 使用 NED 坐标系
-        - 需要对 X 轴速度取反
+        - 当前实测中 X/Y 控制方向均需取反修正
         """
         msg = TwistStamped()
         msg.header = Header()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = "map"
 
-        # ========== 坐标系变换：ENU → NED ==========
-        msg.twist.linear.x = -vx  # X 取反
-        msg.twist.linear.y = vy   # Y 不变
+        # ========== 速度映射（按当前实测方向） ==========
+        msg.twist.linear.x = vx
+        msg.twist.linear.y = vy
         msg.twist.linear.z = vz   # Z 不变
         
         msg.twist.angular.x = 0.0
@@ -423,11 +441,12 @@ def main(args=None):
     node = ArucoPositionControlNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

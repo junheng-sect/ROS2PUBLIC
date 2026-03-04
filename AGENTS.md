@@ -59,7 +59,7 @@ project_ws/
 - `aruco_detector`, `aruco_detector_mid`, `aruco_threshold`, `aruco_csv`
 - `aruco_gazebo`, `aruco_gazebo_rviz`, `aruco_tf_vision`
 - `aruco_position_controller`, `aruco_tracking`, `aruco_landing`
-- `px4_position_controller`, `px4_disarm`, `offboard_control`
+- `px4_position_controller`, `px4_disarm`, `offboard_control`, `rover_teleop_ackermann`, `rover_auto_motion`
 - `aruco_interfaces`, `px4_interfaces`
 - `camera_test`, `camera_calibration_pkg`, `gazebo_image_test`, `tf_display`
 
@@ -83,6 +83,8 @@ project_ws/
 - `px4_interfaces`：PX4 相关自定义服务接口包（如目标位置、解锁服务）。
 - `px4_position_controller`：PX4 Offboard 位置控制节点。
 - `offboard_control`：Offboard 任务控制节点（解锁、起飞、悬停、降落、上锁）。
+- `rover_teleop_ackermann`：方向键遥控与简化阿克曼运动学控制包（通过 Gazebo `SetEntityPose` 驱动 `rover`）。
+- `rover_auto_motion`：Rover 自动运动节点（前进 1m + 右转 90°@1m 半径）循环执行。
 - `tf_display`：TF 广播与可视化辅助包。
 
 ## 环境要求
@@ -163,6 +165,40 @@ ros2 topic hz /camera/image_raw
   解答：可在 Gazebo 界面查看用户相机的 Position/Orientation，或保存 GUI 配置后在配置文件中读取 `camera pose`（`x y z roll pitch yaw`）。
 - 2026-03-04 | 问题：`pitch`、`roll`、`yaw` 分别绕哪个轴旋转？
   解答：`roll` 绕 `X` 轴，`pitch` 绕 `Y` 轴，`yaw` 绕 `Z` 轴（右手系约定）。
+- 2026-03-04 | 问题：如何用 Gazebo 打开位于桌面的 rover 车？
+  解答：若桌面有 rover 的 `.sdf/.world` 文件，可直接用 `gz sim /home/zjh/Desktop/xxx.sdf` 或 `gz sim /home/zjh/Desktop/xxx.world`；若是模型目录，则先通过 `GZ_SIM_RESOURCE_PATH` 指向桌面模型路径，再在 world 中 `include` 模型。
+- 2026-03-04 | 问题：你能控制桌面上的文件吗，或者进行打开操作？
+  解答：可以在终端权限范围内读写、创建、删除和打开文件（例如执行 `ls/cat/cp/mv/rm`、`gz sim`、`xdg-open` 等命令）；但我不能像人一样直接点鼠标操作桌面 GUI。
+- 2026-03-04 | 问题：如何查看并打开 `/home/zjh/桌面/rover`？
+  解答：先检查目录内容；若缺少 `model.sdf/model.config/world` 需补齐后再用 `GZ_SIM_RESOURCE_PATH=/home/zjh/桌面` 启动 `gz sim /home/zjh/桌面/rover/rover.world`。
+- 2026-03-04 | 问题：如何在 Gazebo 中测量小车尺寸？
+  解答：可用 GUI 的测量工具（Measure）直接量两点距离；也可在模型 `model.sdf` 里查看 `collision/visual` 的 `size/scale`，或用话题/TF 获取关键点坐标后计算距离。
+- 2026-03-04 | 问题：可以通过修改 `model.sdf` 来缩放车的尺寸吗？
+  解答：可以。若是 mesh 模型可修改 `<mesh><scale>x y z</scale></mesh>`；若是几何体可直接改 `<box><size>...</size></box>` 等尺寸参数，需同步调整 `collision`、惯量和传感器安装位姿。
+- 2026-03-04 | 问题：如何把车宽调到 0.6m 并整体等比例放大/缩放？
+  解答：先以当前宽度计算缩放系数 `k=目标宽度/当前宽度`，再在 `model.sdf` 里同步修改 `mesh scale`、`collision size`，并按比例更新位姿高度与惯量参数。
+- 2026-03-04 | 问题：如何把当前模型整体放大 5 倍？
+  解答：将几何尺度参数统一乘以 5（如 `mesh scale`、`collision size`、参考位姿 `z`），若保持物理一致性还需同步更新 `mass`（`×5^3`）与惯量（`×5^5`）。
+- 2026-03-04 | 问题：模型在当前基础上再扩大 2 倍怎么做？
+  解答：在现有参数基础上将几何尺寸与位姿尺度乘 `2`，并同步物理参数：`mass × 2^3`、惯量 `× 2^5`，保持动力学一致。
+- 2026-03-04 | 问题：模型在当前基础上再扩大 1.5 倍怎么做？
+  解答：在现有参数基础上将几何与位姿尺度乘 `1.5`，并同步物理参数：`mass × 1.5^3`、惯量 `× 1.5^5`，保证物理一致性。
+- 2026-03-04 | 问题：如何在 `~/PX4_Firmware/Tools/simulation/gz/worlds` 新建保留 aruco 内容并加入 `rover_ackermann` 的世界？
+  解答：复制 `aruco.sdf` 为新文件（如 `aruco_rover.sdf`），保留原内容后新增 `<include><uri>model://rover_ackermann</uri><pose>...</pose></include>`，并将 `pose` 放到远离原点的位置避免与无人机重叠。
+- 2026-03-04 | 问题：如何执行到能够正常打开带 rover 的 aruco 仿真？
+  解答：使用 `PX4_GZ_WORLD=aruco_rover make px4_sitl gz_x500_mono_cam_down` 启动；若卡在 `Waiting for Gazebo world`，需检查世界文件的 `<world name>` 与 `PX4_GZ_WORLD` 完全一致。
+- 2026-03-04 | 问题：无人机默认在原点，如何生成更高并放在 rover 上方？
+  解答：启动 PX4 SITL 时设置 `PX4_GZ_MODEL_POSE="x,y,z,roll,pitch,yaw"`，例如 `PX4_GZ_MODEL_POSE="0,0,4.2,0,0,0"`；其中 `z` 调大即可抬高出生点。
+- 2026-03-04 | 问题：如何在 Gazebo 中通过键盘方向键控制 rover（最好阿克曼转向）？需要创建功能包吗？
+  解答：建议创建 ROS 2 功能包。当前 rover 是静态长方体，无法直接运动；要实现方向键+阿克曼，需要改成可动底盘模型（转向关节+驱动轮）并接入阿克曼控制（插件或控制节点），再由键盘节点发布控制命令。
+- 2026-03-04 | 问题：确认采用“简化伪阿克曼+方向键”后如何落地？
+  解答：已新增 `rover_teleop_ackermann` 包，使用“方向键节点发布 `/rover/ackermann_cmd` + 运动学控制节点调用 `/world/rover/set_pose`”实现；默认限幅 `v_max=0.6m/s`、`steer_max=25°`。
+- 2026-03-04 | 问题：为什么 rover 只能前后、不能转向，且前进+左转会停住？
+  解答：终端对组合方向键的重复上报不稳定，原逻辑按“轴独立超时”会把另一轴清零。已改为“任意方向键共享超时”，只要有按键活动就保持当前 `v/delta`，可同时前进并转向。
+- 2026-03-04 | 问题：改成 WASD 后仍有卡顿，尤其 A/D 转向时灵时不灵怎么办？
+  解答：已将键盘读取改为 `raw + os.read`（避免文本缓冲导致的按键丢失/延迟），并把 `key_timeout_sec` 默认调大到 `0.55s` 以覆盖系统按键重复延迟；同时新增 `SPACE` 一键急停，提升可控性。
+- 2026-03-04 | 问题：`W+D` 后松开 `D` 会停住、再按 `A/D` 无效，且 `Ctrl+C` 无法关闭节点怎么办？
+  解答：已将终端模式从 `raw` 改为 `cbreak`（恢复 `Ctrl+C` 信号），并把键盘发布频率提升到 `40Hz`、超时增大到 `0.90s`，降低组合键切换时因按键重复间隙触发清零的问题。
 
 ## 修改记录
 
@@ -177,6 +213,39 @@ ros2 topic hz /camera/image_raw
 - 2026-03-04：按要求同步更新“问题记录”，新增 `offboard_control` 的 yaw 与 local position 相关问答。
 - 2026-03-04：补充记录准则：每轮对话必须同步记录（代码改动写“修改记录”，问题解答写“问题记录”）；并补录 Gazebo 视角与 GUI 相机位姿查看问题。
 - 2026-03-04：补录姿态角基础问答：`roll/pitch/yaw` 对应旋转轴分别为 `X/Y/Z`。
+- 2026-03-04：补录 Gazebo 使用问答：如何从桌面路径启动 rover 模型/世界文件。
+- 2026-03-04：补录能力边界问答：可在终端权限范围内操作桌面文件与执行打开命令，但不进行鼠标式 GUI 点击。
+- 2026-03-04：已检查 `/home/zjh/桌面/rover` 目录并补齐 Gazebo 所需文件（`model.config`、`model.sdf`、`rover.world`），可通过 `gz sim` 按路径加载。
+- 2026-03-04：补录 Gazebo 尺寸测量问答：GUI 测量工具与模型文件参数两种方式。
+- 2026-03-04：补录模型缩放问答：可通过 `model.sdf` 的 `scale/size` 调整车体尺寸，并建议同步修正碰撞与惯量参数。
+- 2026-03-04：按“车宽=0.6m、整体等比例”修改 `/home/zjh/桌面/rover/model.sdf`：缩放系数 `0.75`，更新 `mesh scale`、`collision size`，并同步调整 `pose.z` 与惯量参数。
+- 2026-03-04：将 `/home/zjh/桌面/rover/model.sdf` 在当前基础上整体放大 5 倍：更新 `mesh scale`、`collision size`、`pose.z`，并按比例同步 `mass` 与惯量参数。
+- 2026-03-04：将 `/home/zjh/桌面/rover/model.sdf` 在当前基础上再次整体放大 2 倍：更新 `mesh scale`、`collision size`、`pose.z`，并同步 `mass`（×8）与惯量（×32）。
+- 2026-03-04：将 `/home/zjh/桌面/rover/model.sdf` 在当前基础上再次整体放大 1.5 倍：更新 `mesh scale`、`collision size`、`pose.z`，并同步 `mass`（×1.5³）与惯量（×1.5⁵）。
+- 2026-03-04：在 `~/PX4_Firmware/Tools/simulation/gz/worlds` 新建 `aruco_rover.sdf`：完整保留 `aruco.sdf` 内容，并新增 `rover_ackermann`（`pose=8 0 0.04 0 0 0`）以避免与原点无人机重叠。
+- 2026-03-04：联调修复 `aruco_rover` 启动卡住问题：将世界文件名与世界内部 `<world name>` 对齐为 `aruco_rover`，并验证 `Gazebo world is ready`、`world: aruco_rover` 正常输出。
+- 2026-03-04：按新要求移除 `rover_ackermann`：将桌面模型 `/home/zjh/桌面/rover` 复制到 `~/PX4_Firmware/Tools/simulation/gz/models/rover`，并把 `aruco_rover.sdf` 的 `include` 改为 `model://rover`（保持 `pose=8 0 0.04 0 0 0` 避免与无人机重叠）；启动验证日志显示 `Gazebo world is ready`。
+- 2026-03-04：将 `~/PX4_Firmware/Tools/simulation/gz/models/rover/model.sdf` 按当前尺寸整体缩小到 `2/3`：同步更新 `mesh scale`（`11.25 -> 7.5`）、`collision size`（`13.5 9.0 5.625 -> 9.0 6.0 3.75`）、`pose.z`（`2.25 -> 1.5`）及惯量参数（`mass` 与 `ixx/iyy/izz`）以保持物理一致性。
+- 2026-03-04：将世界名称统一改为 `rover`：`~/PX4_Firmware/Tools/simulation/gz/worlds/aruco_rover.sdf` 重命名为 `rover.sdf`，并将文件内 `<world name>` 同步改为 `rover`，避免 `PX4_GZ_WORLD` 与 world 名不一致导致等待世界超时。
+- 2026-03-04：修复“无人机与 rover 悬浮”问题：`rover` 模型碰撞体较大（`9m x 6m`），当 `include pose` 改为 `x=1` 时与原点无人机出生区重叠导致相互顶起；已将 `~/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf` 中 rover 位姿改回 `x=8`（`pose=8 0 0.04 0 0 0`）并完成启动验证。
+- 2026-03-04：为实现“先加载 rover，再将无人机刷在 rover 上方”，已将 `~/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf` 中 rover `include pose` 调整到原点（`0 0 0.04 0 0 0`）；启动时通过 `PX4_GZ_MODEL_POSE` 指定无人机出生高度（示例 `0,0,4.2,0,0,0`），日志确认 `Spawning model at position: 0 0 4.2`。
+- 2026-03-04：按要求将 `rover` 碰撞体改为“自身体积”：`~/PX4_Firmware/Tools/simulation/gz/models/rover/model.sdf` 的 `collision` 从 `box` 改为与 `visual` 同源 `mesh`（`model://rover/meshes/ogv.dae`，`scale=7.5 7.5 7.5`）。
+- 2026-03-04：调整 `rover` 世界中的 ArUco 布置：删除原先无位姿的世界 ArUco include，并将 `model://myaruco` 以显式位姿放置到 rover 顶面（`pose=0 0 3.43 0 0 0`）。
+- 2026-03-04：将 `rover` 世界中的复杂 rover 模型替换为简化平台：在 `~/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf` 中新增静态长方体 `rover_box`（`1 x 0.7 x 0.3`，中心位于世界原点上方 `z=0.15`）；`myaruco` 调整到长方体上表面中心（`pose=0 0 0.301 0 0 0`）；并通过 `PX4_GZ_MODEL_POSE="0,0,0.65,0,0,0"` 验证无人机可刷在平台上方。
+- 2026-03-04：按“直接改 rover 模型和世界”的要求重构：`~/PX4_Firmware/Tools/simulation/gz/models/rover/model.sdf` 直接改为静态长方体（`1 x 0.7 x 0.3`），`~/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf` 改回 `include model://rover`（位于世界中心），并保留 `myaruco` 在上表面中心（`pose=0 0 0.301 0 0 0`）。
+- 2026-03-04：修正长方体“下沉 0.15m”问题：将 `models/rover/model.sdf` 的模型内 `pose` 归零，改为在 `worlds/rover.sdf` 的 `include model://rover` 中设置 `z=0.15`，确保 `0.3m` 高盒体底面贴地。
+- 2026-03-04：实现 ArUco 与长方体刚性绑定：将 ArUco 从 `worlds/rover.sdf` 的独立 `include` 移除，改为在 `models/rover/model.sdf` 内新增 `aruco_link`（顶面中心平面贴图）并通过 `fixed joint` 连接到 `base_link`，保证长方体移动时 ArUco 同步跟随。
+- 2026-03-04：补录问答：Gazebo 键盘控制 rover 的实现路径（需动态底盘 + 阿克曼控制链路，建议新建 ROS 2 功能包承载键盘到控制命令映射）。
+- 2026-03-04：补录问答：如何通过 `PX4_GZ_MODEL_POSE` 将无人机出生点抬高并放置到 rover 上方。
+- 2026-03-04：新增功能包 `rover_teleop_ackermann`（`ament_python`，Apache-2.0）：包含 `keyboard_arrow_teleop_node`（方向键发布 `/rover/ackermann_cmd`）与 `ackermann_kinematic_controller_node`（自行车模型积分并调用 `/world/rover/set_pose`）。
+- 2026-03-04：新增启动文件 `rover_teleop_ackermann.launch.py`，拉起 `ros_gz_bridge parameter_bridge`（`/world/rover/set_pose@ros_gz_interfaces/srv/SetEntityPose`）与两个控制节点；并新增包内 `README.md/readme.md` 使用说明。
+- 2026-03-04：完成构建与验证：`colcon build --packages-select rover_teleop_ackermann` 通过，`ros2 launch rover_teleop_ackermann rover_teleop_ackermann.launch.py` 启动成功（桥接与控制节点正常启动）。
+- 2026-03-04：修复 `keyboard_arrow_teleop_node` 组合键控制异常：将 `v`/`delta` 的独立按键超时改为共享超时（`_last_any_key_time`），解决“前进+转向时停住”和“无法持续转向”问题；已重新 `colcon build --packages-select rover_teleop_ackermann` 并验证 launch 可正常拉起。
+- 2026-03-04：将 `rover_teleop_ackermann` 键位由方向键改为 `W/A/S/D`：`keyboard_arrow_teleop_node` 改为识别 `w/s/a/d`（含大写），并同步更新 `README.md/readme.md` 键位说明；已完成 `colcon build --packages-select rover_teleop_ackermann` 与 `source install/setup.bash`。
+- 2026-03-04：进一步修复 `WASD` 间歇卡顿：`keyboard_arrow_teleop_node` 改为 `tty.setraw + os.read` 读取 TTY 原始字节，降低按键丢失；将 `key_timeout_sec` 默认由 `0.12/0.55` 统一为 `0.55s` 以规避系统按键重复初始延迟，并新增 `SPACE` 急停；同步更新 `README.md/readme.md`，并完成 `colcon build --packages-select rover_teleop_ackermann` 与 `source install/setup.bash`。
+- 2026-03-04：针对“`W+D` 松开后停住、`Ctrl+C` 无法退出”继续修复：`keyboard_arrow_teleop_node` 终端模式由 `tty.setraw` 改为 `tty.setcbreak`（恢复中断信号），并将 `publish_rate_hz` 默认提升到 `40.0`、`key_timeout_sec` 调整为 `0.90`，减小组合键切换导致的误停；同步更新 `README.md/readme.md`，并完成 `colcon build --packages-select rover_teleop_ackermann`、`source install/setup.bash` 与 `py_compile` 自检。
+- 2026-03-04：新增功能包 `rover_auto_motion`（`ament_python`，Apache-2.0）：新增 `rover_auto_loop_node`，按“前进 1m -> 右转 90°（半径 1m）-> 循环”发布 `/rover/ackermann_cmd`；并新增 `rover_auto_motion.launch.py`（拉起 `ros_gz_bridge`、`ackermann_kinematic_controller_node` 与自动运动节点）及包内 `README.md/readme.md`。
+- 2026-03-04：完成 `rover_auto_motion` 构建与验证：`colcon build --packages-select rover_auto_motion` 与 `py_compile` 通过；`ros2 launch rover_auto_motion rover_auto_motion.launch.py` 启动成功，日志可见阶段切换 `straight -> turn_right -> straight`。
 
 ### Git 仓库与远程
 - 2026-03-03：配置 Git 全局撤销别名（`undo`、`unstage`、`discard`、`last`），用于快速撤销工作区/暂存区改动。

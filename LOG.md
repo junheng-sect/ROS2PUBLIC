@@ -12,6 +12,8 @@
   解答：已将 `.bashrc` 中工作空间 source 行切换为 `zjh_ws`，并使用存在性判断避免报错：`if [ -f ~/project/zjh_ws/install/setup.bash ]; then source ...; fi`。
 - 2026-03-05 | 问题：不要再生成小写 `readme.md`，并删除已有小写文档。
   解答：已将规则写入“协作与记录要求”（仅允许 `README.md`），并删除现有小写 `readme.md` 文件。
+- 2026-03-05 | 问题：把当前工作空间内容上传到远程仓库。
+  解答：已在 `zjh_ws` 的 `simple` 分支完成提交并推送到 `origin/simple`。
 
 ## 修改记录
 
@@ -29,6 +31,7 @@
 - 2026-03-05：接入远程仓库 `origin=https://github.com/junheng-sect/ROS2PUBLIC.git`。
 - 2026-03-05：创建并推送 `simple` 分支，上传本工作空间源码。
 - 2026-03-05：执行 `git push -f origin simple`，远程 `simple` 已由 `71fdeb0` 强制更新覆盖。
+- 2026-03-05：执行常规推送，提交 `426eaaf` 已上传到 `origin/simple`。
 
 ### 功能包修改记录
 - 记录要求：本节必须按“功能包小标题”分组记录修改，后续新增记录不得混写在同一列表中。

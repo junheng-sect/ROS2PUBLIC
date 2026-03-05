@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = 'tcec_test'
+package_name = 'tvec'
 
 setup(
     name=package_name,
@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'tvec_rvec_node = tcec_test.tvec_rvec_node:main',
+            'tvec_rvec_node = tvec.tvec_rvec_node:main',
         ],
     },
 )

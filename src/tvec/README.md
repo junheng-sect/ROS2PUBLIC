@@ -1,4 +1,4 @@
-# tcec_test
+# tvec
 
 用于分析 ArUco 检测输出 `tvec/rvec` 与坐标系关系的测试功能包。
 
@@ -7,14 +7,14 @@
 - 计算并输出每次检测的相对位姿 `tvec/rvec`。
 - 以 **1Hz** 日志输出最新 `tvec/rvec`。
 - 将 `tvec/rvec` 按时间戳写入 CSV。
-- 发布标注图像到 `/tcec_test/image_annotated`，并在 RViz 显示。
+- 发布标注图像到 `/tvec/image_annotated`，并在 RViz 显示。
 
 ## 启动
 ```bash
-cd ~/project/project_ws
+cd ~/project/zjh_ws
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 launch tcec_test tcec_test.launch.py world_name:=rover
+ros2 launch tvec tvec.launch.py world_name:=rover
 ```
 
 可选参数：
@@ -27,7 +27,7 @@ ros2 launch tcec_test tcec_test.launch.py world_name:=rover
   - `tvec=(tx, ty, tz)`
   - `rvec=(rx, ry, rz)`
 - CSV 默认目录：
-  - `~/project/project_ws/src/tcec_test/log/`
+  - `~/project/zjh_ws/src/tvec/log/`
 
 ## 目的
 用于彻底理清 `tvec/rvec` 与相机坐标系、标记坐标系之间的对应关系，便于后续 TF 设计与控制器建模。

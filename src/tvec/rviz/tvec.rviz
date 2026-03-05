@@ -14,7 +14,7 @@ Visualization Manager:
       Name: ArUco Annotated
       Enabled: true
       Topic:
-        Value: /tcec_test/image_annotated
+        Value: /tvec/image_annotated
       Alpha: 1
       Normalize Range: true
       Median window: 5

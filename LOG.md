@@ -41,6 +41,8 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
   解答：已在 `matrix_marker_in_cam_node` 中对旋转矩阵增加 `Rz(+90°)` 修正（右乘方式），并重新构建与环境加载，发布话题仍为 `/debug/matrix/marker_in_cam`。
 - 2026-03-06 | 问题：在 `debug_interface` 新增一个 4x4 变换矩阵接口（`R` 为 3x3、`t` 为 3x1、最后一行为 `[0 0 0 1]`）。
   解答：已新增 `TransformMatrix4x4.msg`（`float64[16] matrix`，行优先存储并写明矩阵约定），并纳入 `CMakeLists.txt` 的接口生成列表；构建后通过 `ros2 interface show debug_interface/msg/TransformMatrix4x4` 验证成功。
+- 2026-03-06 | 问题：确认功能正确后，将当前工作空间代码上传到远程仓库。
+  解答：已在 `simple` 分支完成提交并推送到 `origin/simple`。
 
 ## 修改记录
 
@@ -59,6 +61,7 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-05：创建并推送 `simple` 分支，上传本工作空间源码。
 - 2026-03-05：执行 `git push -f origin simple`，远程 `simple` 已由 `71fdeb0` 强制更新覆盖。
 - 2026-03-05：执行常规推送，提交 `426eaaf` 已上传到 `origin/simple`。
+- 2026-03-06：执行常规推送，提交 `03e2da2` 已上传到 `origin/simple`。
 
 ### 功能包修改记录
 - 记录要求：本节必须按“功能包小标题”分组记录修改，后续新增记录不得混写在同一列表中。

@@ -3,7 +3,7 @@
 ## 问题记录
 
 - 2026-03-06 | 问题：继续完成本地 Git 操作，并将工作空间上传到新建分支 `ubuntu2204simple`。
-  解答：已在 `zjh_ws` 初始化本地 Git 仓库、配置撤回别名（`undo/unstage/discard/last/rollback`）、绑定远程 `origin`，并准备提交后推送到 `origin/ubuntu2204simple`。
+  解答：已在 `zjh_ws` 初始化本地 Git 仓库、配置撤回别名（`undo/unstage/discard/last/rollback`）、绑定远程 `origin`、创建并提交 `ubuntu2204simple` 分支；推送到 `origin/ubuntu2204simple` 时因本机缺少 GitHub 凭据失败（HTTPS 无用户名凭据，SSH 无公钥授权）。
 - 2026-03-06 | 问题：阅读 `AGENTS.md` 与 `LOG.md`，明确协作要求并熟悉接下来要做的功能。
   解答：已完成两份文档核对；后续将严格执行记录、构建、launch 验证、中文详细注释、`README.md` 命名与分支策略，并以 `tvec`（视觉检测/位姿发布）与 `debug_interface`（调试消息接口）为当前功能基础继续开发。
 - 2026-03-05 | 问题：将 `zjh_ws` 接入 GitHub 远程并创建 `simple` 分支上传源码。
@@ -35,6 +35,7 @@
 ### Git 仓库与远程
 - 2026-03-06：在 `~/project/zjh_ws` 新建本地 Git 仓库，新增撤回别名：`undo/unstage/discard/last/rollback`。
 - 2026-03-06：重新绑定远程仓库 `origin=https://github.com/junheng-sect/ROS2PUBLIC.git`，目标上传分支为 `ubuntu2204simple`。
+- 2026-03-06：创建本地分支 `ubuntu2204simple` 并完成提交 `518b804`；远程推送受认证限制未完成（需配置 GitHub HTTPS 凭据或 SSH Key）。
 - 2026-03-05：接入远程仓库 `origin=https://github.com/junheng-sect/ROS2PUBLIC.git`。
 - 2026-03-05：创建并推送 `simple` 分支，上传本工作空间源码。
 - 2026-03-05：执行 `git push -f origin simple`，远程 `simple` 已由 `71fdeb0` 强制更新覆盖。

@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = 'relative_pose'
+package_name = 'rivz'
 
 setup(
     name=package_name,
@@ -19,7 +19,7 @@ setup(
     zip_safe=True,
     maintainer='zjh',
     maintainer_email='junhengsect+1647307223@qq.com',
-    description='Compute base pose in ArUco FLU frame from tvec/rvec',
+    description='Launch aggregation package for tvec, matrix nodes and tf broadcast',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -28,7 +28,6 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'relative_pose_node = relative_pose.relative_pose_node:main',
         ],
     },
 )

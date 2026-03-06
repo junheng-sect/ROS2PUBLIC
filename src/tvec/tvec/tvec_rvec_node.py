@@ -196,16 +196,18 @@ class TVecRVecNode(Node):
     def log_callback(self):
         # 1Hz 摘要日志 + CSV 刷盘，兼顾可读性与数据可靠落盘。
         if self.latest_tvec is None or self.latest_rvec is None:
-            self.get_logger().info('No detection in last period')
+            # 按当前调试需求，关闭该节点的周期性 INFO 日志输出。
+            # self.get_logger().info('No detection in last period')
             return
 
         t = self.latest_tvec
         r = self.latest_rvec
-        self.get_logger().info(
-            f'ID={self.latest_id} | '
-            f'tvec=({t[0]:.4f}, {t[1]:.4f}, {t[2]:.4f}) | '
-            f'rvec=({r[0]:.4f}, {r[1]:.4f}, {r[2]:.4f})'
-        )
+        # 按当前调试需求，关闭该节点的周期性 INFO 日志输出。
+        # self.get_logger().info(
+        #     f'ID={self.latest_id} | '
+        #     f'tvec=({t[0]:.4f}, {t[1]:.4f}, {t[2]:.4f}) | '
+        #     f'rvec=({r[0]:.4f}, {r[1]:.4f}, {r[2]:.4f})'
+        # )
 
         if self.csv_writer is not None:
             self.csv_writer.writerow([

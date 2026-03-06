@@ -20,11 +20,20 @@ Visualization Manager:
       Median window: 5
       Min Value: 0
       Max Value: 1
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Marker Scale: 1
+      Frame Timeout: 15
+      Update Interval: 0
   Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: camera_link
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:

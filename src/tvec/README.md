@@ -6,6 +6,7 @@
 - 订阅相机图像并检测 ArUco。
 - 计算并输出每次检测的相对位姿 `tvec/rvec`。
 - 以 **1Hz** 日志输出最新 `tvec/rvec`。
+- 新增 `rvec_yaw_node`：从 `rvec` 计算相对 `yaw` 并以 **1Hz** 日志输出。
 - 将 `tvec/rvec` 按时间戳写入 CSV。
 - 发布标注图像到 `/tvec/image_annotated`，并在 RViz 显示。
 
@@ -21,6 +22,14 @@ ros2 launch tvec tvec.launch.py world_name:=rover
 - `world_name`：默认 `aruco`
 - `model_name`：默认 `x500_mono_cam_down_0`
 - `ros_image_topic`：默认 `/camera/image_raw`
+
+单独启动 yaw 计算节点：
+```bash
+cd ~/project/zjh_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run tvec rvec_yaw_node
+```
 
 ## 日志与CSV
 - 1Hz 日志示例：

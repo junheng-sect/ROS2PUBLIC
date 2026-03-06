@@ -1,19 +1,21 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>relative_pose</name>
+  <name>matrix_baselink_in_marker</name>
   <version>0.0.0</version>
-  <description>Compute base pose in ArUco FLU frame from tvec/rvec</description>
+  <description>Publish marker to baselink transform matrix</description>
   <maintainer email="junhengsect+1647307223@qq.com">zjh</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>debug_interface</depend>
+  <exec_depend>python3-numpy</exec_depend>
   <exec_depend>tvec</exec_depend>
+  <exec_depend>marker_in_cam</exec_depend>
+  <exec_depend>matrix_marker_in_cam</exec_depend>
+  <exec_depend>matrix_baselink_in_cam</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
-
-  <exec_depend>python3-numpy</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

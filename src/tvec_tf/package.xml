@@ -1,23 +1,20 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tvec</name>
-  <version>0.0.1</version>
-  <description>ArUco tvec/rvec test package for pose and coordinate analysis</description>
+  <name>tvec_tf</name>
+  <version>0.0.0</version>
+  <description>Broadcast vision_pose TF from TVecRVec</description>
   <maintainer email="junhengsect+1647307223@qq.com">zjh</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
-  <depend>sensor_msgs</depend>
-  <depend>cv_bridge</depend>
-  <depend>aruco_interfaces</depend>
+  <depend>tf2_ros</depend>
+  <depend>geometry_msgs</depend>
   <depend>debug_interface</depend>
-  <exec_depend>python3-numpy</exec_depend>
-
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
-  <exec_depend>ros_gz_bridge</exec_depend>
-  <exec_depend>rviz2</exec_depend>
+  <depend>launch</depend>
+  <depend>launch_ros</depend>
+  <depend>tvec</depend>
+  <depend>tf_broadcast</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

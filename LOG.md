@@ -188,3 +188,52 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 #### tf_broadcast
 - 2026-03-06：在 `src/tf_broadcast/tf_broadcast/map_base_link_tf_node.py` 注释掉 1Hz 周期日志（含 `发布TF map->base_link` 与“尚未收到 Pose 数据”输出）。
 - 2026-03-06：完成 `colcon build --symlink-install` 与 `source install/setup.bash`。
+- 2026-03-07 | 问题：在本工作空间创建 `aruco_tracking` 功能包，要求进入 OFFBOARD 后通过 PID 调速控制无人机飞到标志上方并正对，输入从 `/debug/aruco_pose` 读取。
+  解答：已新建 `aruco_tracking`（ament_python），实现 `tracking_node`：订阅 `/debug/aruco_pose` 与 `/mavros/state`，在 `OFFBOARD` 且视觉有效时执行 PID 控制并发布 `/mavros/setpoint_velocity/cmd_vel`，目标默认为 `x=0,y=0,z=1.5,yaw=0`；视觉超时或非 OFFBOARD 自动零速悬停。
+
+#### aruco_tracking
+- 2026-03-07：新建功能包 `src/aruco_tracking`（`ament_python`，Apache-2.0），新增节点 `src/aruco_tracking/aruco_tracking/tracking_node.py`，实现基于 `/debug/aruco_pose` 的 PID 速度控制（x/y/z/yaw）与 OFFBOARD 门控逻辑。
+- 2026-03-07：新增启动文件 `src/aruco_tracking/launch/aruco_tracking.launch.py`，联合启动 `tvec_tf.launch.py` 与 `tracking_node`。
+- 2026-03-07：完善 `src/aruco_tracking/setup.py`、`src/aruco_tracking/package.xml`、`src/aruco_tracking/README.md`，补齐入口点、launch 安装与使用说明。
+- 2026-03-07：完成 `colcon build --symlink-install`、`source install/setup.bash`，并执行 `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 启动验证通过。
+- 2026-03-07 | 问题：跟踪轨迹呈圆弧，控制量看起来不对。
+  解答：已在 `aruco_tracking` 中加入坐标系补偿：先在 marker 坐标系计算 XY 误差，再按 `marker_in_map_yaw_deg`（默认 +90°）旋转到 map/ENU 后输出速度控制，避免因误差坐标系与速度命令坐标系不一致导致绕圈。
+
+#### aruco_tracking
+- 2026-03-07：更新 `src/aruco_tracking/aruco_tracking/tracking_node.py`，新增参数 `rotate_error_to_map`（默认 `True`）和 `marker_in_map_yaw_deg`（默认 `90.0`），并实现 `err_marker -> err_cmd(map)` 的二维旋转补偿再做 PID。
+- 2026-03-07：状态日志改为同时输出 `err_marker` 与 `err_cmd`，便于区分“输入误差”和“参与控制的误差”。
+- 2026-03-07：更新 `src/aruco_tracking/README.md` 说明坐标旋转补偿用途，完成 `colcon build --symlink-install` 与 `source install/setup.bash`。
+- 2026-03-07 | 问题：这次控制正确后，询问“刚才具体改了什么”。
+  解答：核心改动是给 `aruco_tracking` 增加“误差坐标旋转补偿”：先在 marker 坐标系计算 `ex_m/ey_m`，再按 `marker_in_map_yaw_deg`（默认 +90°）旋转成 map/ENU 下 `ex_cmd/ey_cmd` 后进入 PID，从而避免因坐标系不一致导致圆弧轨迹；同时日志增加 `err_marker` 与 `err_cmd` 的分离输出便于验证。
+- 2026-03-07 | 问题：去掉 z 方向 PID 调节，保持相同高度。
+  解答：已在 `aruco_tracking` 控制器中移除 z 方向 PID 链路，控制输出改为 `vz=0` 常量；节点仅控制 x/y/yaw。同步更新 launch 参数与 README 说明，并完成构建、source、launch 启动验证。
+
+#### aruco_tracking
+- 2026-03-07：更新 `src/aruco_tracking/aruco_tracking/tracking_node.py`，删除 `target_z`、`kp_z/ki_z/kd_z`、`vz_limit`、`enable_z_control` 等 z-PID 参数及 `pid_z` 控制器，控制环中 `vz` 固定为 `0.0`。
+- 2026-03-07：更新 `src/aruco_tracking/launch/aruco_tracking.launch.py`，移除 z 方向相关参数传递。
+- 2026-03-07：更新 `src/aruco_tracking/README.md`，明确“z 方向不做 PID，固定 `vz=0` 保持高度”。
+- 2026-03-07：完成 `colcon build --symlink-install`、`source install/setup.bash`，并执行 `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 启动验证通过。
+- 2026-03-07 | 问题：为何日志中高度（`/debug/aruco_pose.z`）一直下降？
+  解答：`/debug/aruco_pose.z` 是基于视觉解算得到的相对量（marker 与相机的相对几何距离），不是飞控绝对高度；在 Offboard 下当前控制器 `vz=0` 仅表示“不给垂向速度指令”，不等于“严格锁高”。若要稳定真实高度，应查看 `/mavros/local_position/pose.z` 并增加高度保持策略（例如位置锁高或非PID/小P补偿）。
+- 2026-03-07 | 问题：希望使用“相对高度保持不变”方式定高，并用 PID 控制相对高度。
+  解答：已在 `aruco_tracking` 中新增“相对高度保持 PID”：进入 OFFBOARD 后锁定当前 `aruco_pose.z` 为 `z_ref`，后续用 `ez=z_ref-z_now` 经 PID 计算 `vz`；同时保留 x/y/yaw 跟踪。期间修复了一处 f-string 语法错误并通过构建与 launch 验证。
+
+#### aruco_tracking
+- 2026-03-07：在 `src/aruco_tracking/aruco_tracking/tracking_node.py` 新增参数 `enable_relative_z_hold`、`reset_z_ref_on_offboard`、`kp_z_hold/ki_z_hold/kd_z_hold`、`vz_limit`，并新增 `pid_z_hold` 控制器与 `z_ref` 状态。
+- 2026-03-07：控制循环改为“OFFBOARD后首次锁定 z_ref，再按 `ez=z_ref-z_now` 输出 `vz`”，实现相对高度 PID 保持。
+- 2026-03-07：更新 `src/aruco_tracking/launch/aruco_tracking.launch.py`，加入相对高度保持参数默认值。
+- 2026-03-07：更新 `src/aruco_tracking/README.md`，说明 z 方向由“相对高度保持 PID”实现。
+- 2026-03-07：修复 `tracking_node.py` 的 f-string 语法错误（`float("nan")` -> `float("nan")` 的转义问题已更正为合法表达式），完成 `colcon build --symlink-install`、`source install/setup.bash`，并执行 `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：把 `project_ws` 中的 `rover_auto_motion` 功能包迁移到当前工作空间 `zjh_ws`。
+  解答：已完成迁移：`/home/zjh/project/project_ws/src/rover_auto_motion -> /home/zjh/project/zjh_ws/src/rover_auto_motion`，并按规范删除小写 `readme.md`，仅保留 `README.md`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### rover_auto_motion
+- 2026-03-07：从 `project_ws` 迁移 `rover_auto_motion` 到 `zjh_ws/src`，保留包结构、launch、节点与配置文件。
+- 2026-03-07：按文档规范删除 `src/rover_auto_motion/readme.md`，仅保留 `src/rover_auto_motion/README.md`。
+- 2026-03-07：已执行 `colcon build --symlink-install --packages-select rover_auto_motion` 并执行 `source install/setup.bash`，包可被 `ros2 pkg list` 正常识别。
+- 2026-03-07 | 问题：给定一段 `aruco_tracking` 日志，跟踪失败原因是什么？
+  解答：从日志看是“控制方向与坐标系未完全一致导致目标越追越远 + 最终目标丢失触发视觉超时”。表现为：`err_marker.x` 从约 1m 持续增到 3m、`vy` 长时间打到限幅 `-0.800`，说明控制在持续推向错误方向或横向补偿不足；随后 `tvec_tf_node` 多秒输出完全相同数据，`tracking_node` 判定 `pose_timeout_sec` 超时进入零速悬停。根因可归纳为 `aruco_pose` 语义与 `/cmd_vel` 控制坐标系之间仍存在符号/旋转不一致，叠加速度限幅与视场边界后导致目标离开相机视野。

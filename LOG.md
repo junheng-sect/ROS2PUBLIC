@@ -258,5 +258,176 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-07：执行测试验证：
   1) `ros2 topic hz /mavros/local_position/pose` 约 30Hz；
   2) `ros2 topic info /mavros/local_position/pose -v` 确认发布端为 `BEST_EFFORT`；
+
+## 问题记录（本轮补充）
+- 2026-03-07 22:25:05 CST | 问题：在这个对话中，我会问你各类问题，你需要把我问的问题和你的解答记录在 `zjh_ws` 工作空间的 `questions` 文件夹 `LOG.md` 文件中，标注上时间。
+  解答：已创建 `questions/LOG.md`，从本轮对话开始，后续问题与解答都会按时间追加记录到该文件中。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 22:25:05 CST：新增问答专用日志文件 `questions/LOG.md`，用于记录本对话中的问题与解答，并按时间戳追加。
   3) `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 复测中 `tracking_node` 已进入 `OFFBOARD跟踪中`，不再出现“本地位姿超时”连续报错。
 - 2026-03-07：按规则执行 `colcon build --symlink-install --packages-select aruco_tracking` 与 `source install/setup.bash`，并完成 launch 启动验证后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：我之前的对话记录到哪去了？
+  解答：历史记录没有丢失，已统一迁移并保存在工作区根目录 `LOG.md`（路径：`/home/zjh/project/zjh_ws/LOG.md`）；`AGENTS.md` 里仅保留规则与日志入口说明。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07：按“每轮对话都记录”规则，新增一条问答记录，说明历史对话记录位置为 `LOG.md`，并确认当前日志入口有效。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：`.codex` 文件在哪里？
+  解答：当前机器上的 `.codex` 路径为 `/home/zjh/.codex`（用户主目录下的隐藏目录）。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07：按“每轮对话都记录”规则，补充记录 `.codex` 路径查询结果（`/home/zjh/.codex`）。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：阅读 `AGENTS.md` 和 `LOG.md`，了解项目进度。
+  解答：已完成阅读并形成当前进度结论：视觉链路（`tvec`/`tvec_tf`/矩阵链）与 `aruco_tracking` 控制链均已打通，且已定位并修复 `/mavros/local_position/pose` 的 QoS 不匹配问题；当前可在 `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 下进入 OFFBOARD 跟踪流程。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07：按“每轮对话都记录”规则，新增“阅读 AGENTS/LOG 并总结项目进度”的问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：记住我的各类要求。
+  解答：已确认并将持续遵循当前工作区 `AGENTS.md` 约束（含每轮记录、构建/source、launch 验证、中文注释、README 命名与 Git 流程等）。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07：按“每轮对话都记录”规则，新增“记住并持续遵循用户要求”的问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：根据输入的代码、实验步骤、现象、实验结果等内容，撰写论文片段初稿，参考指定 PDF 格式，并将 `.md` 输出到 `paper` 文件夹。
+  解答：已基于当前工作区中的 `aruco_tracking` 控制代码、实验现象与日志，整理生成 Markdown 论文片段初稿 `paper/aruco_tracking_paper_draft.md`，内容包含摘要、系统架构、控制方法、公式、实验步骤、现象分析与结论，并补充 `paper/README.md` 说明目录用途。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-07：新增 `paper/aruco_tracking_paper_draft.md`，按本科论文常见结构整理基于 ArUco 视觉跟踪控制的正文初稿，包含可预览公式。
+- 2026-03-07：新增 `paper/README.md`，说明 `paper/` 目录的用途与当前文件构成。
+- 2026-03-07：按“每轮对话都记录”规则，在“问题记录”中补充本轮“论文片段初稿生成”问答。
+
+## 问题记录（本轮补充）
+- 2026-03-07 22:34:30 CST | 问题：`PX4` 中的 `Return` 模式实现原理是什么？
+  解答：`Return` 本质上是 PX4 的自动返航状态机（RTL）。触发后，飞控会根据当前高度、返航点位置和返航参数，按“爬升到安全高度、返航到 Home/Rally、下降到指定高度、最终悬停或降落”的流程自动执行；多旋翼主要受 `RTL_RETURN_ALT`、`RTL_DESCEND_ALT` 及最终动作参数控制，不同机型还会叠加各自的进近/着陆逻辑。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 22:34:30 CST：按“每轮对话都记录”规则，新增“PX4 Return 模式实现原理”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-07 22:36:27 CST | 问题：返航目标点是怎么获得的？
+  解答：PX4 返航目标点默认取自 `Home Position`，该位置通常在定位有效时由飞控自动记录；若系统配置了 `Rally Point` 等替代返航点，RTL 会按配置优先选择更合适的安全点，否则回到 `Home`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 22:36:27 CST：按“每轮对话都记录”规则，新增“返航目标点来源”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-07 22:39:32 CST | 问题：`Home Position` 在 `PX4` 里具体是在哪个模块设置的、什么时候更新、`ROS 2/MAVROS` 怎么读到它？
+  解答：`Home Position` 在 PX4 内由 `commander` 模块维护，满足定位与状态条件后自动设置/更新；PX4 通过 MAVLink `HOME_POSITION` 对外发布，MAVROS 会桥接成 `mavros_msgs/msg/HomePosition`，ROS 2 一般从 `/mavros/home_position/home` 订阅读取，主动设置则可用 `/mavros/cmd/set_home` 对应的 `CommandHome` 服务。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 22:39:32 CST：按“每轮对话都记录”规则，新增“Home Position 模块、更新时机与 ROS 2/MAVROS 读取方式”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-07 22:44:37 CST | 问题：继续讲 `Home Position` 和 `vehicle_global_position`、`local_position_ned`、`EKF` 原点这几个概念的区别。
+  解答：`Home Position` 是返航/安全逻辑使用的参考点；`vehicle_global_position` 是飞行器当前的实时全球位置估计；`local_position_ned` 是飞行器相对局部原点的实时局部位置估计；`EKF` 原点则是该局部坐标系的零点定义。它们用途不同，`Home` 与 `EKF` 原点也不必相同。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 22:44:37 CST：按“每轮对话都记录”规则，新增“Home Position、global/local position 与 EKF 原点区别”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-07 22:48:08 CST | 问题：`home` 点刚需 `GPS` 吗？我如果要做一个返航 `home` 点的程序，是否刚需 `GPS`？
+  解答：不刚需。对 PX4 原生 `RTL` 来说，核心要求是有效的全局三维位置估计，GPS 只是最常见来源；若用户自己写返航程序，则只要具备可靠位置估计并在同一坐标系下定义了 `home`，即使没有 GPS，也可以实现返航。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 22:48:08 CST：按“每轮对话都记录”规则，新增“home 点是否刚需 GPS、返航程序是否必须 GPS”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：创建一个依赖 GPS 的返航功能包 `return_home`，流程为“先升到 3m，再飞回 home 点水平位置并悬停”。
+  解答：已新建 `return_home`（`ament_python`），实现 `return_home_node`：订阅 `/mavros/global_position/global`、`/mavros/global_position/rel_alt`、`/mavros/state`，采用三阶段状态机 `ASCEND -> RETURN -> HOVER` 控制 `/mavros/setpoint_velocity/cmd_vel`，满足“先升高、后返航、再悬停”的流程要求。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_home
+- 2026-03-07：在 `src` 下创建新功能包 `src/return_home`（`ament_python`，Apache-2.0），并补齐维护者与依赖（`rclpy/geometry_msgs/mavros_msgs/sensor_msgs/std_msgs/launch/launch_ros`）。
+- 2026-03-07：新增节点 `src/return_home/return_home/return_home_node.py`：
+  1) 首次有效 GPS 锁定 home 点；
+  2) `ASCEND` 阶段仅控制 `vz` 升至 3m；
+  3) `RETURN` 阶段按经纬度误差换算北东米误差并输出 `vx/vy` 返回 home；
+  4) `HOVER` 阶段水平置零并维持 3m。
+- 2026-03-07：新增启动文件 `src/return_home/launch/return_home.launch.py`，提供默认参数与单节点启动入口。
+- 2026-03-07：新增文档 `src/return_home/README.md`（大写），说明返航流程、话题、参数和运行命令。
+- 2026-03-07：更新 `src/return_home/setup.py` 与 `src/return_home/package.xml`，补齐入口点 `return_home_node`、launch/README 安装项及描述信息。
+- 2026-03-07：按规则完成构建与验证：
+  1) `colcon build --symlink-install --packages-select return_home` 通过；
+  2) `source install/setup.bash` 已执行；
+  3) `ros2 launch return_home return_home.launch.py` 启动验证通过（节点成功拉起，测试后主动停止）。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：进入 OFFBOARD 模式后才开始 `return_home`。
+  解答：已完成：`return_home` 现在仅在 OFFBOARD 上升沿启动返航任务，并默认在该时刻锁定当前 GPS 为 home 点；未进入 OFFBOARD 时始终输出零速。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_home
+- 2026-03-07：更新 `src/return_home/return_home/return_home_node.py`，新增参数 `start_return_on_offboard_entry` 与 `lock_home_on_offboard_entry`（默认均为 `True`）。
+- 2026-03-07：在 `state_callback` 中新增 OFFBOARD 上升沿触发逻辑：上升沿重置阶段为 `ASCEND`、重置 PID，并在条件满足时启动返航任务。
+- 2026-03-07：将 home 锁定时机改为“OFFBOARD 上升沿（或 OFFBOARD 后 GPS 就绪时）”，保证返航基准与任务启动时刻一致。
+- 2026-03-07：在控制循环中新增“未触发返航启动前保持零速”分支，确保进入 OFFBOARD 前后行为可控。
+- 2026-03-07：更新 `src/return_home/launch/return_home.launch.py` 默认参数，开启 OFFBOARD 触发启动与 OFFBOARD 锁定 home。
+- 2026-03-07：更新 `src/return_home/README.md`，补充 OFFBOARD 触发机制与相关参数说明。
+- 2026-03-07：按规则完成验证：`colcon build --symlink-install --packages-select return_home`、`source install/setup.bash`、`ros2 launch return_home return_home.launch.py` 启动通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：返航逻辑修改为“仍然先上升到 3m”，但 home 点改为订阅 `/mavros/home_position/home`。
+  解答：已完成：节点在 OFFBOARD 后先执行 `ASCEND` 升至 3m，再读取 `HomePosition.geo` 的经纬度执行 `RETURN`，到达水平容差后进入 `HOVER`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_home
+- 2026-03-07：重构 `src/return_home/return_home/return_home_node.py` 的 home 来源，新增订阅 `/mavros/home_position/home`（`mavros_msgs/msg/HomePosition`），以 `geo.latitude/longitude` 作为返航目标。
+- 2026-03-07：保留“OFFBOARD 触发启动 + 先升高到 3m”策略：状态机仍为 `ASCEND -> RETURN -> HOVER`，其中 `ASCEND` 阶段通过 `rel_alt` 调整至 3m。
+- 2026-03-07：新增 `try_start_after_data_ready()`，要求 `GPS + rel_alt + home_position` 数据齐全后才启动返航，避免数据缺失导致误控。
+- 2026-03-07：更新 `src/return_home/launch/return_home.launch.py`，新增 `home_topic=/mavros/home_position/home` 默认参数，移除旧的 `lock_home_on_offboard_entry` 参数。
+- 2026-03-07：更新 `src/return_home/README.md`，同步说明 home 点来源改为 `/mavros/home_position/home`，并保持“先升到 3m 再返航”的流程描述。
+- 2026-03-07：按规则完成验证：`colcon build --symlink-install --packages-select return_home`、`source install/setup.bash`、`ros2 launch return_home return_home.launch.py` 启动通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：日志显示“已进入 OFFBOARD，等待返航启动条件满足，输出零速”，为什么没有返航？
+  解答：该日志表示 `return_home` 已进入 OFFBOARD，但尚未同时收到启动所需数据（`/mavros/global_position/global`、`/mavros/global_position/rel_alt`、`/mavros/home_position/home`）。本次现场检查中这 3 个话题均为 `Unknown topic`，因此节点会持续零速等待，不会进入返航阶段。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07：按“每轮对话都记录”规则，补充“OFFBOARD 后等待返航启动条件”问题的定位结论与排查记录。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：日志显示“已进入 OFFBOARD，等待返航启动条件满足，输出零速”，为什么不返航？
+  解答：根因是 `return_home` 与 MAVROS 话题的 QoS 不兼容，导致关键数据实际未被节点接收：`/mavros/global_position/global` 与 `/mavros/global_position/rel_alt` 发布端为 `BEST_EFFORT`，而节点原订阅为默认 `RELIABLE`；同时 `/mavros/home_position/home` 为 `TRANSIENT_LOCAL`，节点需匹配该 durability 才能稳定拿到 home 消息。已修复后，启动条件可正常满足。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_home
+- 2026-03-07：修复 `src/return_home/return_home/return_home_node.py` 订阅 QoS 兼容性：
+  1) `/mavros/global_position/global` 订阅改为 `BEST_EFFORT + VOLATILE + KEEP_LAST(10)`；
+  2) `/mavros/global_position/rel_alt` 订阅改为 `BEST_EFFORT + VOLATILE + KEEP_LAST(10)`；
+  3) `/mavros/home_position/home` 订阅改为 `RELIABLE + TRANSIENT_LOCAL + KEEP_LAST(1)`。
+- 2026-03-07：补充中文注释说明 MAVROS 话题 QoS 特征与兼容原因，避免再次出现“有话题但回调收不到数据”的问题。
+- 2026-03-07：按规则执行 `colcon build --symlink-install --packages-select return_home`、`source install/setup.bash`，并启动 `return_home.launch.py` 验证。
+- 2026-03-07：验证结果：`ros2 topic info -v` 显示 `return_home_node` 已正确挂到 3 个关键话题，且 QoS 与发布端匹配（`global/rel_alt` 为 `BEST_EFFORT`，`home_position` 为 `RELIABLE+TRANSIENT_LOCAL`）。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：功能验证“成功”，要求上传代码。
+  解答：已按确认执行 Git 提交并推送流程，将 `return_home` 相关实现与日志更新上传到远程 `origin/simple`。
+
+## 修改记录（本轮补充）
+### Git 仓库与远程
+- 2026-03-07：在收到“成功”确认后执行提交与推送，上传 `return_home` 功能包及本轮日志更新到 `origin/simple`。

@@ -237,3 +237,26 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-07：已执行 `colcon build --symlink-install --packages-select rover_auto_motion` 并执行 `source install/setup.bash`，包可被 `ros2 pkg list` 正常识别。
 - 2026-03-07 | 问题：给定一段 `aruco_tracking` 日志，跟踪失败原因是什么？
   解答：从日志看是“控制方向与坐标系未完全一致导致目标越追越远 + 最终目标丢失触发视觉超时”。表现为：`err_marker.x` 从约 1m 持续增到 3m、`vy` 长时间打到限幅 `-0.800`，说明控制在持续推向错误方向或横向补偿不足；随后 `tvec_tf_node` 多秒输出完全相同数据，`tracking_node` 判定 `pose_timeout_sec` 超时进入零速悬停。根因可归纳为 `aruco_pose` 语义与 `/cmd_vel` 控制坐标系之间仍存在符号/旋转不一致，叠加速度限幅与视场边界后导致目标离开相机视野。
+- 2026-03-07 | 问题：希望无论 ArUco 坐标系 yaw 如何变化，无人机都能正确跟踪 xyz 和 yaw；当前 yaw 正常但 xy 输出固定在 E/N。
+  解答：已在 `aruco_tracking` 中将 XY 误差变换从“固定角旋转”改为“动态 yaw 旋转”，实时使用 `yaw_map_marker = yaw_map_base - yaw_marker_base`（`yaw_map_base` 来自 `/mavros/local_position/pose`，`yaw_marker_base` 来自 `/debug/aruco_pose.yaw`）；并新增本地位姿超时保护，超时时零速悬停。
+
+#### aruco_tracking
+- 2026-03-07：更新 `src/aruco_tracking/aruco_tracking/tracking_node.py`，新增参数 `base_pose_topic`、`use_dynamic_marker_yaw`、`fallback_marker_in_map_yaw_deg`、`base_pose_timeout_sec`，并新增 `/mavros/local_position/pose` 订阅用于提取 `yaw_map_base`。
+- 2026-03-07：在控制循环中将 XY 误差变换改为动态旋转：`e_map = R(yaw_map_marker) * e_marker`，其中 `yaw_map_marker = wrap(yaw_map_base - yaw_marker_base)`；保留 yaw 跟踪目标 `yaw_marker_base -> 0` 与相对高度 PID 策略。
+- 2026-03-07：新增本地位姿新鲜度判断 `is_base_pose_fresh()`，当启用动态 yaw 且本地位姿超时时，直接输出零速悬停，避免错误速度发散。
+- 2026-03-07：增强 1Hz 状态日志，新增 `yaw_map_base`、`yaw_marker_base`、`yaw_map_marker`、`err_map` 字段，便于在线排查坐标变换。
+- 2026-03-07：更新 `src/aruco_tracking/launch/aruco_tracking.launch.py`，替换为新参数组（动态 yaw + 回退角 + base_pose 超时）。
+- 2026-03-07：更新 `src/aruco_tracking/README.md`，补充动态 yaw 旋转机制与超时保护说明。
+- 2026-03-07：已执行 `colcon build --symlink-install --packages-select aruco_tracking`、`source install/setup.bash`，并执行 `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 启动验证通过后停止。
+- 2026-03-07 | 问题：`aruco_tracking` 日志持续出现“本地位姿超时，输出零速悬停”。
+  解答：该现象说明节点未持续收到 `/mavros/local_position/pose`（或频率过低低于 `base_pose_timeout_sec`），因此触发动态 yaw 模式下的保护逻辑。排查顺序：先确认 MAVROS 已启动并有本地位姿数据（`ros2 topic hz /mavros/local_position/pose`），再确认话题名是否一致；临时可通过增大 `base_pose_timeout_sec` 或关闭 `use_dynamic_marker_yaw` 进行对照测试。
+- 2026-03-07 | 问题：要求“直接进行测试”，定位 `本地位姿超时，输出零速悬停`。
+  解答：已完成在线测试并定位根因：`/mavros/local_position/pose` 发布端 QoS 为 `BEST_EFFORT`，`aruco_tracking` 原订阅使用默认 QoS（`RELIABLE`）导致不兼容，从而回调收不到本地位姿并持续触发超时悬停。修复后已复测通过。
+
+#### aruco_tracking
+- 2026-03-07：修复 `src/aruco_tracking/aruco_tracking/tracking_node.py` 中 `/mavros/local_position/pose` 订阅 QoS，改为显式 `BEST_EFFORT + VOLATILE + KEEP_LAST(depth=10)`，并补充中文注释说明兼容性原因。
+- 2026-03-07：执行测试验证：
+  1) `ros2 topic hz /mavros/local_position/pose` 约 30Hz；
+  2) `ros2 topic info /mavros/local_position/pose -v` 确认发布端为 `BEST_EFFORT`；
+  3) `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 复测中 `tracking_node` 已进入 `OFFBOARD跟踪中`，不再出现“本地位姿超时”连续报错。
+- 2026-03-07：按规则执行 `colcon build --symlink-install --packages-select aruco_tracking` 与 `source install/setup.bash`，并完成 launch 启动验证后停止。

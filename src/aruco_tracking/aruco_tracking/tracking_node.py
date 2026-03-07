@@ -4,9 +4,10 @@ import math
 import time
 
 import rclpy
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from mavros_msgs.msg import State
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from debug_interface.msg import ArucoBasePose
 
 
@@ -62,6 +63,7 @@ class ArucoTrackingNode(Node):
 
         # ========= 参数 =========
         self.declare_parameter('pose_topic', '/debug/aruco_pose')
+        self.declare_parameter('base_pose_topic', '/mavros/local_position/pose')
         self.declare_parameter('state_topic', '/mavros/state')
         self.declare_parameter('cmd_vel_topic', '/mavros/setpoint_velocity/cmd_vel')
 
@@ -89,8 +91,12 @@ class ArucoTrackingNode(Node):
         self.declare_parameter('yaw_rate_deadband', 0.02)
         # 坐标系补偿：将 marker 坐标系中的 XY 误差旋转到速度命令坐标系（map/ENU）。
         self.declare_parameter('rotate_error_to_map', True)
-        # map->arucomarker 的偏航角（度），默认 +90°（与当前静态 TF 一致）。
-        self.declare_parameter('marker_in_map_yaw_deg', 90.0)
+        # 是否启用动态 yaw 旋转（实时用 map->base_link 与 marker->base_link 推算 map->marker）。
+        self.declare_parameter('use_dynamic_marker_yaw', True)
+        # 动态 yaw 计算失败时的回退值（度），用于保障可控性。
+        self.declare_parameter('fallback_marker_in_map_yaw_deg', 90.0)
+        # 本地位姿超时阈值（秒），仅在 use_dynamic_marker_yaw=True 时生效。
+        self.declare_parameter('base_pose_timeout_sec', 0.5)
         # 是否启用“相对高度保持”（使用 /debug/aruco_pose.z 做参考）。
         self.declare_parameter('enable_relative_z_hold', True)
         # 进入 OFFBOARD 后是否重置相对高度参考值。
@@ -102,6 +108,7 @@ class ArucoTrackingNode(Node):
         self.declare_parameter('kd_z_hold', 0.06)
 
         self.pose_topic = self.get_parameter('pose_topic').value
+        self.base_pose_topic = self.get_parameter('base_pose_topic').value
         self.state_topic = self.get_parameter('state_topic').value
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
 
@@ -125,7 +132,9 @@ class ArucoTrackingNode(Node):
         self.velocity_deadband = float(self.get_parameter('velocity_deadband').value)
         self.yaw_rate_deadband = float(self.get_parameter('yaw_rate_deadband').value)
         self.rotate_error_to_map = bool(self.get_parameter('rotate_error_to_map').value)
-        self.marker_in_map_yaw_deg = float(self.get_parameter('marker_in_map_yaw_deg').value)
+        self.use_dynamic_marker_yaw = bool(self.get_parameter('use_dynamic_marker_yaw').value)
+        self.fallback_marker_in_map_yaw_deg = float(self.get_parameter('fallback_marker_in_map_yaw_deg').value)
+        self.base_pose_timeout_sec = float(self.get_parameter('base_pose_timeout_sec').value)
         self.enable_relative_z_hold = bool(self.get_parameter('enable_relative_z_hold').value)
         self.reset_z_ref_on_offboard = bool(self.get_parameter('reset_z_ref_on_offboard').value)
 
@@ -144,14 +153,32 @@ class ArucoTrackingNode(Node):
         self.pose = ArucoBasePose()
         self.has_pose = False
         self.last_pose_time = None
+        self.base_yaw = 0.0
+        self.has_base_pose = False
+        self.last_base_pose_time = None
         self.z_ref = None
         self.prev_offboard = False
 
         self.latest_status = ''
 
         # ========= 通信 =========
+        # /mavros/local_position/pose 发布端是 BEST_EFFORT。
+        # 这里显式使用 BEST_EFFORT QoS，避免默认 RELIABLE 造成 QoS 不兼容而收不到数据。
+        mavros_pose_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+        )
+
         self.state_sub = self.create_subscription(State, self.state_topic, self.state_callback, 10)
         self.pose_sub = self.create_subscription(ArucoBasePose, self.pose_topic, self.pose_callback, 10)
+        self.base_pose_sub = self.create_subscription(
+            PoseStamped,
+            self.base_pose_topic,
+            self.base_pose_callback,
+            mavros_pose_qos,
+        )
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_vel_topic, 10)
 
         self.control_timer = self.create_timer(1.0 / max(self.control_rate_hz, 1.0), self.control_loop)
@@ -159,7 +186,8 @@ class ArucoTrackingNode(Node):
 
         self.get_logger().info(
             'aruco_tracking_node 已启动 | '
-            f'pose={self.pose_topic} | state={self.state_topic} | cmd={self.cmd_vel_topic}'
+            f'pose={self.pose_topic} | base_pose={self.base_pose_topic} | '
+            f'state={self.state_topic} | cmd={self.cmd_vel_topic}'
         )
 
     @staticmethod
@@ -174,6 +202,13 @@ class ArucoTrackingNode(Node):
         s = math.sin(yaw_rad)
         return c * x - s * y, s * x + c * y
 
+    @staticmethod
+    def quaternion_to_yaw(x: float, y: float, z: float, w: float) -> float:
+        """四元数转 yaw（绕 Z 轴角），结果范围为 [-pi, pi]。"""
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        return math.atan2(siny_cosp, cosy_cosp)
+
     def state_callback(self, msg: State):
         # 检测 OFFBOARD 上升沿，可选地重置相对高度参考。
         if msg.mode == 'OFFBOARD' and not self.prev_offboard and self.reset_z_ref_on_offboard:
@@ -187,12 +222,26 @@ class ArucoTrackingNode(Node):
         self.has_pose = True
         self.last_pose_time = self.get_clock().now()
 
+    def base_pose_callback(self, msg: PoseStamped):
+        """接收 map->base_link 位姿并提取 yaw，用于实时估计 map->marker 的偏航角。"""
+        q = msg.pose.orientation
+        self.base_yaw = self.quaternion_to_yaw(q.x, q.y, q.z, q.w)
+        self.has_base_pose = True
+        self.last_base_pose_time = self.get_clock().now()
+
     def is_pose_fresh(self) -> bool:
         """判断视觉位姿是否超时。"""
         if not self.has_pose or self.last_pose_time is None:
             return False
         dt = (self.get_clock().now() - self.last_pose_time).nanoseconds / 1e9
         return dt <= self.pose_timeout_sec
+
+    def is_base_pose_fresh(self) -> bool:
+        """判断 map->base_link 位姿是否超时。"""
+        if not self.has_base_pose or self.last_base_pose_time is None:
+            return False
+        dt = (self.get_clock().now() - self.last_base_pose_time).nanoseconds / 1e9
+        return dt <= self.base_pose_timeout_sec
 
     def publish_cmd(self, vx: float, vy: float, vz: float, wz: float):
         """发布速度控制指令。"""
@@ -229,10 +278,20 @@ class ArucoTrackingNode(Node):
         z_now = float(self.pose.z)
         eyaw = self.wrap_to_pi(self.target_yaw - float(self.pose.yaw))
 
-        # /mavros/setpoint_velocity/cmd_vel 通常在局部坐标系（map/ENU）解释。
-        # 因此默认将 marker 坐标误差旋转到 map 坐标再做 PID，避免“绕圈/走圆弧”。
+        # /mavros/setpoint_velocity/cmd_vel 在当前链路按局部 map 坐标解释。
+        # 这里先把 marker 系误差旋转到 map 系，再进入 PID，确保 ArUco yaw 变化时 XY 跟踪方向正确。
+        yaw_map_base = self.base_yaw
+        yaw_marker_base = float(self.pose.yaw)
+        yaw_map_marker = math.radians(self.fallback_marker_in_map_yaw_deg)
         if self.rotate_error_to_map:
-            yaw_map_marker = math.radians(self.marker_in_map_yaw_deg)
+            if self.use_dynamic_marker_yaw:
+                if not self.is_base_pose_fresh():
+                    self.publish_cmd(0.0, 0.0, 0.0, 0.0)
+                    self.latest_status = '本地位姿超时，输出零速悬停'
+                    return
+                # yaw_map_marker = yaw_map_base - yaw_marker_base
+                # 其中 yaw_marker_base 来自 /debug/aruco_pose.yaw（机体相对 marker）。
+                yaw_map_marker = self.wrap_to_pi(yaw_map_base - yaw_marker_base)
             ex_cmd, ey_cmd = self.rotate_xy(ex_m, ey_m, yaw_map_marker)
         else:
             ex_cmd, ey_cmd = ex_m, ey_m
@@ -262,8 +321,10 @@ class ArucoTrackingNode(Node):
         self.publish_cmd(vx, vy, vz, wz)
 
         self.latest_status = (
-            f'OFFBOARD跟踪中 | err_marker=({ex_m:.3f},{ey_m:.3f},{eyaw:.3f}) | '
-            f'err_cmd=({ex_cmd:.3f},{ey_cmd:.3f}) | '
+            f'OFFBOARD跟踪中 | yaw_map_base={yaw_map_base:.3f}, '
+            f'yaw_marker_base={yaw_marker_base:.3f}, yaw_map_marker={yaw_map_marker:.3f} | '
+            f'err_marker=({ex_m:.3f},{ey_m:.3f},{eyaw:.3f}) | '
+            f'err_map=({ex_cmd:.3f},{ey_cmd:.3f}) | '
             f'z_ref={self.z_ref if self.z_ref is not None else float("nan"):.3f}, '
             f'z_now={z_now:.3f}, ez={ez:.3f} | '
             f'cmd=({vx:.3f},{vy:.3f},{vz:.3f},{wz:.3f})'

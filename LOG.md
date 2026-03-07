@@ -11,6 +11,18 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 
 ## 问题记录
 
+- 2026-03-07 | 问题：创建远程新分支 `laptop`，并将当前工作空间代码上传到远程和本地 Git。
+  解答：已在本地基于当前代码创建分支 `laptop`，完成提交并推送到 `origin/laptop`，同时保留本地分支与上游跟踪关系。
+- 2026-03-07 | 问题：`rover` 世界下现在可以解锁，询问具体修改内容并要求记录。
+  解答：已将 `rover` 世界从“极简版本”改为“默认世界骨架 + rover 模型 include”。核心修改为补齐 `physics / magnetic_field / atmosphere / scene / spherical_coordinates`，并保持 `<world name=\"rover\">` 与 `PX4_GZ_WORLD=rover` 一致；这样恢复了 EKF/GPS 所需环境，`POSCTL` 下可正常解锁。
+- 2026-03-07 | 问题：PX4 提示 `Arming denied: Resolve system health failures first`，无法解锁。
+  解答：这是预检未通过导致；需先执行 `commander check` 查看具体失败项。当前场景常见原因为 EKF 未就绪或链路未满足。已给出处理顺序：先等待/确认 `Gazebo world is ready` 与 EKF 收敛，再保证 Offboard 设定值连续发送；若仅做仿真调试，可临时放宽检查（如 `COM_ARM_WO_GPS=1`）或使用 `commander arm -f` 强制解锁。
+- 2026-03-07 | 问题：`PX4_GZ_WORLD=rover ...` 启动时持续 `Waiting for Gazebo world...`，需要修复。
+  解答：根因是世界文件中的 `<world name>` 为 `rover_world`，与 `PX4_GZ_WORLD=rover` 不一致；已将 `/home/zjh/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf`（以及源文件 `/home/zjh/桌面/rover/rover.world`）的世界名修正为 `rover`，复测后日志显示 `Gazebo world is ready`、`world: rover`。
+- 2026-03-07 | 问题：将 `rover.world` 与 `rover` 模型加入 PX4 Gazebo 资源库，使 `PX4_GZ_WORLD=rover PX4_GZ_MODEL_POSE=\"0,0,2,0,0,0\" make px4_sitl gz_x500_mono_cam_down` 可正确打开世界与模型。
+  解答：已将 `model.config/model.sdf` 复制到 `/home/zjh/PX4_Firmware/Tools/simulation/gz/models/rover/`；由于 `PX4_GZ_WORLD=rover` 实际读取 `worlds/rover.sdf`，已将 `/home/zjh/桌面/rover/rover.world` 同步覆盖到 `/home/zjh/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf`（旧文件备份为 `rover.sdf.bak_20260307`）；启动日志确认加载 `.../worlds/rover.sdf`。
+- 2026-03-07 | 问题：把远程仓库中 `simple` 下载至 `zjh_ws`，替代 `zjh_ws` 中的原有内容。
+  解答：已执行 `git fetch origin simple`、切换本地 `simple` 分支并 `git reset --hard origin/simple`、`git clean -fd`，本地工作区已对齐远程 `origin/simple`（提交 `df0d3ed`）。
 - 2026-03-05 | 问题：将 `zjh_ws` 接入 GitHub 远程并创建 `simple` 分支上传源码。
   解答：已在本工作空间初始化 Git、配置撤回别名、接入远程仓库并推送 `simple` 分支；提交中排除了运行日志目录。
 - 2026-03-05 | 问题：远程 `simple` 已存在，是否覆盖远程分支？
@@ -46,6 +58,17 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 
 ## 修改记录
 
+### PX4 仿真资源
+- 2026-03-07：重构 `/home/zjh/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf`：由极简世界改为默认世界参数骨架（补齐 `physics/magnetic_field/atmosphere/scene/spherical_coordinates`），同时保留 `model://rover` include。
+- 2026-03-07：同步更新源文件 `/home/zjh/桌面/rover/rover.world`，确保后续再复制时不回退到极简版本。
+- 2026-03-07：问题定位结论：`POSCTL` 无法解锁的根因是世界配置过简导致水平状态估计异常（此前观测到 `estimator_status` 的 `velocity_horiz` 与 `pos_horiz` 为 false）。
+- 2026-03-07：补充解锁失败处理说明：`Arming denied` 需先通过 `commander check` 定位预检项（常见为 EKF/链路），并按“先恢复健康、后解锁”的顺序处理；仅仿真调试可临时放宽检查或强制解锁。
+- 2026-03-07：修复 PX4 启动卡住问题：将 `rover.sdf/rover.world` 中 `<world name="rover_world">` 改为 `<world name="rover">`，与 `PX4_GZ_WORLD=rover` 对齐。
+- 2026-03-07：回归验证通过：启动日志出现 `Gazebo world is ready`、`Spawning model at position: 0 0 2`、`world: rover, model: x500_mono_cam_down_0`。
+- 2026-03-07：新增 PX4 Gazebo 自定义资源：`/home/zjh/PX4_Firmware/Tools/simulation/gz/models/rover/model.config`、`/home/zjh/PX4_Firmware/Tools/simulation/gz/models/rover/model.sdf`、`/home/zjh/PX4_Firmware/Tools/simulation/gz/worlds/rover.world`。
+- 2026-03-07：为匹配 `PX4_GZ_WORLD=rover` 的实际读取规则，已将 `rover.world` 覆盖写入 `/home/zjh/PX4_Firmware/Tools/simulation/gz/worlds/rover.sdf`，并备份原文件为 `rover.sdf.bak_20260307`。
+- 2026-03-07：执行 `PX4_GZ_WORLD=rover PX4_GZ_MODEL_POSE=\"0,0,2,0,0,0\" make px4_sitl gz_x500_mono_cam_down` 启动验证，日志确认加载 `.../worlds/rover.sdf`。
+
 ### 工作空间与协作规范
 - 2026-03-05：进入新工作空间 `~/project/zjh_ws` 后，保留规则并重置历史记录内容（保留标题）。
 - 2026-03-05：完成本工作空间 Git 初始化与本地撤回别名配置（`undo/unstage/discard/last`）。
@@ -57,6 +80,8 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-05：日志结构调整：`### 功能包修改记录` 改为按功能包小标题分组记录，并在该节加入固定记录要求。
 
 ### Git 仓库与远程
+- 2026-03-07：新建分支 `laptop` 并上传当前工作空间代码至远程 `origin/laptop`，本地分支已跟踪远程同名分支。
+- 2026-03-07：按要求将本地工作区强制替换为远程 `origin/simple` 内容，当前对齐提交为 `df0d3ed`。
 - 2026-03-05：接入远程仓库 `origin=https://github.com/junheng-sect/ROS2PUBLIC.git`。
 - 2026-03-05：创建并推送 `simple` 分支，上传本工作空间源码。
 - 2026-03-05：执行 `git push -f origin simple`，远程 `simple` 已由 `71fdeb0` 强制更新覆盖。
@@ -260,3 +285,40 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
   2) `ros2 topic info /mavros/local_position/pose -v` 确认发布端为 `BEST_EFFORT`；
   3) `ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover` 复测中 `tracking_node` 已进入 `OFFBOARD跟踪中`，不再出现“本地位姿超时”连续报错。
 - 2026-03-07：按规则执行 `colcon build --symlink-install --packages-select aruco_tracking` 与 `source install/setup.bash`，并完成 launch 启动验证后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：`ros2 launch rover_auto_motion rover_auto_motion.launch.py` 启动失败，提示缺少 `rover_teleop_ackermann`。
+  解答：已将 `rover_auto_motion.launch.py` 改为“可选加载控制器”：若检测不到 `rover_teleop_ackermann` 则仅打印提示并跳过该节点，launch 继续启动 `rover_auto_loop_node`，不再因缺包直接退出。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### rover_auto_motion
+- 2026-03-07：更新 `src/rover_auto_motion/launch/rover_auto_motion.launch.py`，新增 `OpaqueFunction + PackageNotFoundError` 检查，将 `rover_teleop_ackermann` 作为可选组件加载（缺失时跳过并提示）。
+- 2026-03-07：更新 `src/rover_auto_motion/package.xml`，移除强制 `exec_depend`：`rover_teleop_ackermann`，新增 `ament_index_python` 依赖用于运行时包检测。
+- 2026-03-07：更新 `src/rover_auto_motion/README.md`，补充“缺失 `rover_teleop_ackermann` 时的行为说明”。
+- 2026-03-07：已执行 `colcon build`、`source install/setup.bash`，并执行 `ros2 launch rover_auto_motion rover_auto_motion.launch.py` 验证：launch 正常启动，`rover_auto_loop_node` 循环运行，缺失包仅提示不致命。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：`rover_auto_motion` 日志正常但 rover 不运动，要求继续调试直到按代码功能运动。
+  解答：已定位原因为 `ros_gz_bridge parameter_bridge` 未成功桥接 `/world/rover/set_pose` 服务（ROS 侧服务不存在），导致控制命令未生效。已改为在节点中直接调用 `gz service` 设置模型位姿，绕过服务桥接差异；联调验证中 `pose_cmd` 连续变化，且 Gazebo `/world/rover/pose/info` 中 `rover` 的 `x/y/姿态` 实时变化，确认可按“直行+右转”循环运动。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### rover_auto_motion
+- 2026-03-07：重构 `src/rover_auto_motion/rover_auto_motion/rover_auto_loop_node.py` 控制链路：由发布 Ackermann 话题改为直接调用 `gz service /world/rover/set_pose`（`gz.msgs.Pose -> gz.msgs.Boolean`）驱动模型位姿。
+- 2026-03-07：新增位姿积分日志 `pose_cmd`（1Hz），用于输出 `x/y/yaw` 并在线确认运动轨迹。
+- 2026-03-07：更新 `src/rover_auto_motion/launch/rover_auto_motion.launch.py`，移除无效的 `parameter_bridge` 服务桥接节点，仅保留 `rover_auto_loop_node`。
+- 2026-03-07：更新 `src/rover_auto_motion/package.xml` 与 `src/rover_auto_motion/README.md`，同步“直接调用 gz service”的实现说明与依赖关系。
+- 2026-03-07：完成验证：`gz sim -r .../rover.sdf` + `ros2 launch rover_auto_motion rover_auto_motion.launch.py`，`rover_auto_loop_node` 输出 `pose_cmd` 连续变化，`gz topic -e -t /world/rover/pose/info` 观测到 `rover` 位姿持续更新。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：`rover` 运动卡顿，要求“丝滑一点”。
+  解答：已优化 `rover_auto_motion` 的轨迹输出：将位姿更新频率提高到 30Hz，并在“直行/转弯”切换处增加速度与角速度一阶平滑（`cmd_smoothing_tau_sec`，默认 0.18s），减少轨迹跳变和顿挫。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### rover_auto_motion
+- 2026-03-07：更新 `src/rover_auto_motion/rover_auto_motion/rover_auto_loop_node.py`：`publish_rate_hz` 默认从 10Hz 提升到 30Hz；新增参数 `cmd_smoothing_tau_sec`（默认 0.18s）；控制环改为 `v/yaw_rate` 一阶滤波后再积分。
+- 2026-03-07：优化 `set_pose` 调用开销：`subprocess.run` 改为 `stdout=DEVNULL`，缩短服务超时到 500ms，降低单次调用阻塞影响。
+- 2026-03-07：更新 `src/rover_auto_motion/README.md` 参数说明，补充平滑参数与默认值。
+- 2026-03-07：已执行 `colcon build --packages-select rover_auto_motion`、`source install/setup.bash`，并运行 `ros2 launch rover_auto_motion rover_auto_motion.launch.py` 验证：`pose_cmd` 连续变化，转弯段过渡更平滑。

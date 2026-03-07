@@ -352,6 +352,14 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-07 22:48:08 CST：按“每轮对话都记录”规则，新增“home 点是否刚需 GPS、返航程序是否必须 GPS”的问答记录，并同步写入 `questions/LOG.md`。
 
 ## 问题记录（本轮补充）
+- 2026-03-07 23:57:02 CST | 问题：`PX4` 的落地检测机制是什么样的？
+  解答：PX4 落地检测采用分阶段状态机而非单阈值判断，典型状态包括 `ground_contact`、`maybe_landed`、`landed`；多旋翼主要综合低推力、低竖直速度、低水平运动、低角速度等条件持续满足后，逐级判定为接地、可能落地、最终已落地。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-07 23:57:02 CST：按“每轮对话都记录”规则，新增“PX4 落地检测机制”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
 - 2026-03-07 | 问题：创建一个依赖 GPS 的返航功能包 `return_home`，流程为“先升到 3m，再飞回 home 点水平位置并悬停”。
   解答：已新建 `return_home`（`ament_python`），实现 `return_home_node`：订阅 `/mavros/global_position/global`、`/mavros/global_position/rel_alt`、`/mavros/state`，采用三阶段状态机 `ASCEND -> RETURN -> HOVER` 控制 `/mavros/setpoint_velocity/cmd_vel`，满足“先升高、后返航、再悬停”的流程要求。
 
@@ -431,3 +439,139 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### Git 仓库与远程
 - 2026-03-07：在收到“成功”确认后执行提交与推送，上传 `return_home` 功能包及本轮日志更新到 `origin/simple`。
+
+## 问题记录（本轮补充）
+- 2026-03-07 | 问题：创建新功能包 `return_track_hover`，将返航与 ArUco 跟踪结合：进入 OFFBOARD 后先升到 3m，再回 home 点，随后进行 ArUco 跟踪，正对 ArUco 后悬停。
+  解答：已完成：新增 `return_track_hover` 功能包并实现单节点状态机 `ASCEND -> RETURN -> TRACK -> HOVER`；满足“先升高、后返航、再对正并悬停”的完整流程。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_track_hover
+- 2026-03-07：在 `src` 下新建功能包 `src/return_track_hover`（`ament_python`，Apache-2.0），并补齐依赖（`mavros_msgs/debug_interface/geometry_msgs/sensor_msgs/std_msgs/tvec_tf` 等）。
+- 2026-03-07：新增节点 `src/return_track_hover/return_track_hover/return_track_hover_node.py`，实现四阶段控制：
+  1) `ASCEND`：OFFBOARD 后爬升到 `target_alt_m=3.0m`；
+  2) `RETURN`：按 `/mavros/home_position/home` 经纬度进行 GPS 返航；
+  3) `TRACK`：基于 `/debug/aruco_pose` 执行 XY+Yaw PID 跟踪，持续满足阈值后判定对正完成；
+  4) `HOVER`：输出零速度悬停。
+- 2026-03-07：在节点中加入 MAVROS QoS 适配：`global/rel_alt/base_pose` 使用 `BEST_EFFORT`，`home_position` 使用 `RELIABLE + TRANSIENT_LOCAL`，避免订阅不兼容。
+- 2026-03-07：新增联合启动文件 `src/return_track_hover/launch/return_track_hover.launch.py`，复用 `tvec_tf.launch.py` 并同时拉起 `return_track_hover_node`。
+- 2026-03-07：新增文档 `src/return_track_hover/README.md`（大写），说明任务流程、话题与关键参数。
+- 2026-03-07：更新 `src/return_track_hover/setup.py`、`src/return_track_hover/package.xml`，补齐入口点、launch/README 安装项与描述。
+- 2026-03-07：按规则执行验证：
+  1) `colcon build --symlink-install --packages-select return_track_hover` 通过；
+  2) `source install/setup.bash` 已执行；
+  3) `ros2 launch return_track_hover return_track_hover.launch.py world_name:=rover` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：新建 `landing` 功能包，要求进入 OFFBOARD 后以 0.5m/s 下降；参考 PX4 落地检测机制，检测落地后自动 disarm 并完成降落。
+  解答：已完成：新增 `landing` 包并实现 `landing_node`，OFFBOARD 后持续下发 `vz=-0.5m/s`，采用“`extended_state` 落地状态优先 + 低高度/低速度/持续时间启发式”双通道落地判定，判定落地后自动调用 `/mavros/cmd/arming` 发送 `disarm`，`armed=false` 后进入完成态并保持零速。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### landing
+- 2026-03-08：新建功能包 `src/landing`（`ament_python`，Apache-2.0），补齐依赖（`rclpy/geometry_msgs/mavros_msgs/std_msgs/launch/launch_ros`）。
+- 2026-03-08：新增节点 `src/landing/landing/landing_node.py`，实现自动降落状态机：
+  1) OFFBOARD 后开始固定下降 `vz=-0.5m/s`；
+  2) 按 `ExtendedState.landed_state==ON_GROUND` 直接判定落地；
+  3) 同时提供启发式判定（`rel_alt`、`vxy`、`vz` 阈值 + 持续时间）作为兜底；
+  4) 落地后调用 `CommandBool(false)` 自动 disarm，失败按间隔重试；
+  5) 检测 `armed=false` 后判定“降落完成”。
+- 2026-03-08：为 MAVROS 订阅补齐 QoS 适配（`BEST_EFFORT + VOLATILE`），降低话题兼容风险。
+- 2026-03-08：新增启动文件 `src/landing/launch/landing.launch.py`，提供默认参数（下降速度、落地阈值、重试间隔等）。
+- 2026-03-08：新增文档 `src/landing/README.md`（大写），说明流程、话题、服务与参数。
+- 2026-03-08：更新 `src/landing/setup.py` 与 `src/landing/package.xml`，补齐入口点 `landing_node`、launch/README 安装项与描述。
+- 2026-03-08：按规则完成验证：
+  1) `colcon build --symlink-install --packages-select landing` 通过；
+  2) `source install/setup.bash` 已执行；
+  3) `ros2 launch landing landing.launch.py` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：`landing_node` 日志出现 `Disarming denied: not landed`，虽提示“已判定落地”但 disarm 被拒。
+  解答：根因是原逻辑用启发式（低高低速）提前判定落地并立即 disarm，早于飞控 `landed_state` 真正确认。已修复为“仅在 `extended_state.landed_state==ON_GROUND` 时发送 disarm”；启发式仅用于“接地准备态”降速等待，避免提前 disarm 被拒。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### landing
+- 2026-03-08：更新 `src/landing/landing/landing_node.py` 的降落末段逻辑：
+  1) disarm 触发条件改为飞控明确 `ON_GROUND`；
+  2) 启发式判定改为 `touchdown_ready`，仅触发小速度下压，不直接 disarm；
+  3) 新增参数 `touchdown_descent_speed_mps`（默认 `0.15`）用于接地准备阶段。
+- 2026-03-08：更新 `src/landing/launch/landing.launch.py`，加入 `touchdown_descent_speed_mps` 默认参数。
+- 2026-03-08：修复一次文件尾部入口函数缺失问题（补回 `log_callback/main`），并完成回归构建与启动验证。
+- 2026-03-08：按规则执行 `colcon build --symlink-install --packages-select landing`、`source install/setup.bash`、`ros2 launch landing landing.launch.py` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：`landing_node` 仍卡在“接地准备中…等待 landed_state=ON_GROUND”。
+  解答：已新增“启发式 disarm 兜底”路径：在 `landed_state` 长时间不置位时，若低高度/低速度启发式连续满足达到设定时长，则允许触发 disarm 请求，不再无限等待 `ON_GROUND`。同时仍保留 `ON_GROUND` 优先路径。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### landing
+- 2026-03-08：更新 `src/landing/landing/landing_node.py`，新增参数 `allow_heuristic_disarm_fallback`（默认 `True`）与 `heuristic_disarm_hold_sec`（默认 `3.0`）。
+- 2026-03-08：新增 `is_heuristic_landed_confirmed()`，当启发式落地条件持续满足足够时长时，允许进入 disarm 兜底流程。
+- 2026-03-08：控制循环增加兜底分支：若 `ON_GROUND` 未置位但启发式落地持续满足，则执行 `disarm` 重试，避免流程卡死在“接地准备中”。
+- 2026-03-08：更新 `src/landing/launch/landing.launch.py`，增加 `allow_heuristic_disarm_fallback`、`heuristic_disarm_hold_sec` 默认参数。
+- 2026-03-08：更新 `src/landing/README.md`，补充上述两个新参数说明。
+- 2026-03-08：按规则执行 `colcon build --symlink-install --packages-select landing`、`source install/setup.bash`、`ros2 launch landing landing.launch.py` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：落地流程仍不稳定，要求在“启发式已持续满足落地条件”后先将油门拉至最低，再申请 disarm，以帮助飞控检测落地。
+  解答：已实现该策略：启发式落地成立后，先进入“最低油门下压保持”阶段（默认 `vz=-0.35m/s` 持续 `1.0s`），随后再发起 disarm 请求；请求期间保持最低油门下压，不再直接零速 disarm。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### landing
+- 2026-03-08：更新 `src/landing/landing/landing_node.py`：在启发式兜底分支新增“最低油门阶段”，流程变为：
+  1) 启发式落地持续满足；
+  2) 以 `min_throttle_descent_speed_mps` 下压并保持 `min_throttle_hold_before_disarm_sec`；
+  3) 再触发 disarm 兜底请求。
+- 2026-03-08：新增参数 `min_throttle_descent_speed_mps`（默认 `0.35`）与 `min_throttle_hold_before_disarm_sec`（默认 `1.0`）。
+- 2026-03-08：更新 `src/landing/launch/landing.launch.py`，加入上述参数默认值。
+- 2026-03-08：更新 `src/landing/README.md`，补充最低油门阶段参数说明。
+- 2026-03-08：按规则执行 `colcon build --symlink-install --packages-select landing`、`source install/setup.bash`、`ros2 launch landing landing.launch.py` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：要求将兜底流程改为“先进入最低油门下压阶段（默认 `vz=-0.35m/s`），下压持续 `5.0s`，期间每隔 1 秒发送 disarm；已 disarm 后不再发送”。
+  解答：已按要求实现：启发式兜底触发后进入最低油门阶段，持续 `min_throttle_disarm_duration_sec=5.0s` 并按 `disarm_retry_interval_sec=1.0s` 节流发送 disarm；一旦检测 `armed=false` 即进入完成态并停止发送。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### landing
+- 2026-03-08：更新 `src/landing/landing/landing_node.py` 的兜底分支：在最低油门阶段内周期发送 disarm，默认阶段时长 `5.0s`。
+- 2026-03-08：参数调整：`min_throttle_hold_before_disarm_sec` 替换为 `min_throttle_disarm_duration_sec`（默认 `5.0`）。
+- 2026-03-08：保持 `disarm_retry_interval_sec=1.0` 用于“每隔一秒发送 disarm”的节流控制；`armed=false` 后由完成态分支自动停止发送。
+- 2026-03-08：更新 `src/landing/launch/landing.launch.py` 默认参数与 `src/landing/README.md` 说明。
+- 2026-03-08：按规则执行 `colcon build --symlink-install --packages-select landing`、`source install/setup.bash`、`ros2 launch landing landing.launch.py` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：创建新功能包 `total`，融合 `return_track_hover` 和 `landing`：先返回 home，再跟踪并正对 ArUco，正对成功后悬停 1s，最后降落直至 disarm。
+  解答：已完成：新增 `total` 包并实现单节点状态机，按 `ASCEND -> RETURN -> TRACK -> HOVER_BEFORE_LAND -> LAND -> TOUCHDOWN_DISARM -> DONE` 执行全任务，满足“返航+对正+悬停+降落解锁”闭环流程。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### total
+- 2026-03-08：新建功能包 `src/total`（`ament_python`，Apache-2.0），并补齐依赖（`mavros_msgs/debug_interface/geometry_msgs/sensor_msgs/std_msgs/tvec_tf` 等）。
+- 2026-03-08：新增节点 `src/total/total/total_node.py`，实现总任务状态机：
+  1) `ASCEND`：OFFBOARD 后升至 3m；
+  2) `RETURN`：GPS 返航到 home；
+  3) `TRACK`：ArUco 跟踪并正对；
+  4) `HOVER_BEFORE_LAND`：对正成功后悬停 1s；
+  5) `LAND`：按 `0.5m/s` 下降；
+  6) `TOUCHDOWN_DISARM`：最低油门下压并每秒申请 disarm；
+  7) `DONE`：检测 `armed=false` 后结束。
+- 2026-03-08：在 `total_node` 中集成 MAVROS QoS 兼容（`BEST_EFFORT` 与 `home TRANSIENT_LOCAL`），并集成 disarm 服务节流重试逻辑。
+- 2026-03-08：新增联合启动文件 `src/total/launch/total.launch.py`，复用 `tvec_tf.launch.py` 并启动 `total_node`。
+- 2026-03-08：新增文档 `src/total/README.md`（大写），说明完整流程、关键话题与阶段定义。
+- 2026-03-08：更新 `src/total/setup.py`、`src/total/package.xml`，补齐入口点、launch/README 安装项与描述。
+- 2026-03-08：按规则完成验证：
+  1) `colcon build --symlink-install --packages-select total` 通过；
+  2) `source install/setup.bash` 已执行；
+  3) `ros2 launch total total.launch.py world_name:=rover` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：功能验证成功，要求上传代码。
+  解答：已按确认执行 Git 提交并推送，将 `landing`、`return_track_hover`、`total` 及日志更新上传到远程 `origin/simple`。
+
+## 修改记录（本轮补充）
+### Git 仓库与远程
+- 2026-03-08：在收到“成功”确认后执行提交与推送，上传本轮新增功能包与日志更新到 `origin/simple`。

@@ -12,7 +12,7 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 问题记录
 
 - 2026-03-07 | 问题：创建远程新分支 `laptop`，并将当前工作空间代码上传到远程和本地 Git。
-  解答：已在本地基于当前代码创建分支 `laptop`，完成提交并推送到 `origin/laptop`，同时保留本地分支与上游跟踪关系。
+  解答：已在本地基于当前代码创建分支 `laptop` 并完成提交；推送 `origin/laptop` 时因本机缺少 GitHub 凭据失败（HTTPS 无用户名凭据，SSH 无公钥授权），待认证后可立即推送。
 - 2026-03-07 | 问题：`rover` 世界下现在可以解锁，询问具体修改内容并要求记录。
   解答：已将 `rover` 世界从“极简版本”改为“默认世界骨架 + rover 模型 include”。核心修改为补齐 `physics / magnetic_field / atmosphere / scene / spherical_coordinates`，并保持 `<world name=\"rover\">` 与 `PX4_GZ_WORLD=rover` 一致；这样恢复了 EKF/GPS 所需环境，`POSCTL` 下可正常解锁。
 - 2026-03-07 | 问题：PX4 提示 `Arming denied: Resolve system health failures first`，无法解锁。
@@ -80,7 +80,7 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-05：日志结构调整：`### 功能包修改记录` 改为按功能包小标题分组记录，并在该节加入固定记录要求。
 
 ### Git 仓库与远程
-- 2026-03-07：新建分支 `laptop` 并上传当前工作空间代码至远程 `origin/laptop`，本地分支已跟踪远程同名分支。
+- 2026-03-07：新建分支 `laptop` 并完成本地提交；远程 `origin/laptop` 推送因认证缺失未完成，待凭据配置后继续。
 - 2026-03-07：按要求将本地工作区强制替换为远程 `origin/simple` 内容，当前对齐提交为 `df0d3ed`。
 - 2026-03-05：接入远程仓库 `origin=https://github.com/junheng-sect/ROS2PUBLIC.git`。
 - 2026-03-05：创建并推送 `simple` 分支，上传本工作空间源码。

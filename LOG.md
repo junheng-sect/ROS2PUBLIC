@@ -11,6 +11,8 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 
 ## 问题记录
 
+- 2026-03-07 | 问题：提供 PAT，要求继续完成 `laptop` 分支远程上传。
+  解答：已使用 PAT 完成 `laptop` 分支推送到 `origin/laptop`，并将本地仓库远程地址与上游关系恢复为标准形式（`origin=https://github.com/junheng-sect/ROS2PUBLIC.git`，上游 `origin/laptop`）。
 - 2026-03-07 | 问题：创建远程新分支 `laptop`，并将当前工作空间代码上传到远程和本地 Git。
   解答：已在本地基于当前代码创建分支 `laptop` 并完成提交；推送 `origin/laptop` 时因本机缺少 GitHub 凭据失败（HTTPS 无用户名凭据，SSH 无公钥授权），待认证后可立即推送。
 - 2026-03-07 | 问题：`rover` 世界下现在可以解锁，询问具体修改内容并要求记录。
@@ -80,6 +82,7 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-05：日志结构调整：`### 功能包修改记录` 改为按功能包小标题分组记录，并在该节加入固定记录要求。
 
 ### Git 仓库与远程
+- 2026-03-07：基于用户提供 PAT 完成 `laptop` 分支远程推送；本地 `laptop` 已跟踪 `origin/laptop`。
 - 2026-03-07：新建分支 `laptop` 并完成本地提交；远程 `origin/laptop` 推送因认证缺失未完成，待凭据配置后继续。
 - 2026-03-07：按要求将本地工作区强制替换为远程 `origin/simple` 内容，当前对齐提交为 `df0d3ed`。
 - 2026-03-05：接入远程仓库 `origin=https://github.com/junheng-sect/ROS2PUBLIC.git`。

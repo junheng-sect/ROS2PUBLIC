@@ -838,3 +838,14 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ### 功能包修改记录
 #### camera_calibration_pkg
 - 2026-03-08：在 `src/camera_calibration_pkg` 执行解压操作：`tar -xzf calibrationdata.tar.gz -C calibrationdata_extracted`，用于定位并查看标定采样图片及 `ost` 文件。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：要求同步树莓派与 laptop 的 `rasip_pi_ws`，并上传本地 Git 与远程仓库。
+  解答：已完成同步与推送。laptop 侧提交 `a6892b6` 并推送到远程 `origin/rasip_pi`；树莓派侧已 `git pull --ff-only` 对齐到同一提交。`AGENTS.md` 中新增的 PAT 属于本地未提交改动，已单独同步到树莓派文件系统，未进入远程提交。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：配置本仓库 Git 提交身份（`user.name=zjh`、`user.email=zjh@local`），用于完成本地提交。
+- 2026-03-08：新增 `src/camera_calibration_pkg/.gitignore`，忽略 `calibrationdata*.tar.gz` 与 `calibrationdata_extracted/`，避免将标定原始数据提交到仓库。
+- 2026-03-08：完成 laptop 提交并推送远程：`rasip_pi` 分支 `356ca85 -> a6892b6`。
+- 2026-03-08：完成树莓派分支对齐：`~/project/rasip_pi_ws` 已更新到 `a6892b6`。

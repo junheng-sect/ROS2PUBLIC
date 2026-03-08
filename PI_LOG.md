@@ -25,6 +25,8 @@
   解答：已重排 `PI_LOG.md` 结构，新增并统一使用“### 功能包修改记录”章节，且按功能包小标题分组记录。
 - 2026-03-08 | 问题：确认并记住当前 `ost.yaml` 为实机 USB 摄像头参数。
   解答：已确认并记录：`/home/zjh/project/rasip_pi_ws/src/camera_calibration_pkg/calibrationdata_extracted/ost.yaml` 作为当前实机摄像头参数基准文件。
+- 2026-03-08 | 问题：同步树莓派与 laptop 的 `rasip_pi_ws`，并完成本地与远程 Git 上传。
+  解答：已完成：laptop 提交并推送 `a6892b6` 到 `origin/rasip_pi`；树莓派执行 `git fetch/pull --ff-only` 后已对齐到同一提交。
 
 ### 修改记录
 
@@ -71,6 +73,9 @@
 
 #### camera_calibration_pkg
 - 2026-03-08：登记实机 USB 摄像头标定参数文件：`src/camera_calibration_pkg/calibrationdata_extracted/ost.yaml`（作为后续实机视觉参数基准）。
+
+#### 仓库同步
+- 2026-03-08：树莓派 `~/project/rasip_pi_ws` 执行 `git fetch origin rasip_pi && git pull --ff-only origin rasip_pi`，同步到提交 `a6892b6`。
 
 ## 仿真记录
 

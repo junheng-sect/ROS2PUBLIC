@@ -26,11 +26,16 @@ class TVecRVecNode(Node):
         # camera_*：用于位姿解算（solvePnP）的相机内参。
         # marker_size_*：不同 ArUco ID 对应的物理边长（单位：米）。
         # enable_csv_log/csv_log_path：是否保存 tvec/rvec 到 CSV 及其路径。
-        self.declare_parameter('image_topic', '/camera/image_raw')
-        self.declare_parameter('camera_fx', 268.5)
-        self.declare_parameter('camera_fy', 268.5)
-        self.declare_parameter('camera_cx', 320.0)
-        self.declare_parameter('camera_cy', 240.0)
+        self.declare_parameter('image_topic', '/image_raw')
+        self.declare_parameter('camera_fx', 810.78076)
+        self.declare_parameter('camera_fy', 813.75141)
+        self.declare_parameter('camera_cx', 346.24076)
+        self.declare_parameter('camera_cy', 251.50143)
+        self.declare_parameter('dist_k1', -0.410508)
+        self.declare_parameter('dist_k2', 0.102062)
+        self.declare_parameter('dist_p1', 0.001503)
+        self.declare_parameter('dist_p2', -0.000384)
+        self.declare_parameter('dist_k3', 0.0)
         self.declare_parameter('marker_size_33', 0.5)
         self.declare_parameter('marker_size_42', 0.063)
         self.declare_parameter('enable_csv_log', True)
@@ -44,6 +49,11 @@ class TVecRVecNode(Node):
         self.fy = float(self.get_parameter('camera_fy').value)
         self.cx = float(self.get_parameter('camera_cx').value)
         self.cy = float(self.get_parameter('camera_cy').value)
+        self.k1 = float(self.get_parameter('dist_k1').value)
+        self.k2 = float(self.get_parameter('dist_k2').value)
+        self.p1 = float(self.get_parameter('dist_p1').value)
+        self.p2 = float(self.get_parameter('dist_p2').value)
+        self.k3 = float(self.get_parameter('dist_k3').value)
         self.marker_size_33 = float(self.get_parameter('marker_size_33').value)
         self.marker_size_42 = float(self.get_parameter('marker_size_42').value)
         self.enable_csv_log = bool(self.get_parameter('enable_csv_log').value)
@@ -78,7 +88,10 @@ class TVecRVecNode(Node):
             [[self.fx, 0.0, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]],
             dtype=np.float64,
         )
-        self.dist_coeffs = np.zeros((1, 5), dtype=np.float64)
+        self.dist_coeffs = np.array(
+            [[self.k1, self.k2, self.p1, self.p2, self.k3]],
+            dtype=np.float64,
+        )
 
         # 缓存最近一次检测结果，供 1Hz 定时日志与 CSV 写入使用。
         self.latest_id = None

@@ -13,6 +13,7 @@ def generate_launch_description():
     world_name = LaunchConfiguration('world_name')
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
+    use_rqt = LaunchConfiguration('use_rqt')
 
     # 1) 启动 tvec：桥接图像 + tvec 节点 + RViz 显示。
     tvec_launch = IncludeLaunchDescription(
@@ -23,6 +24,7 @@ def generate_launch_description():
             'world_name': world_name,
             'model_name': model_name,
             'ros_image_topic': ros_image_topic,
+            'use_rqt': use_rqt,
         }.items(),
     )
 
@@ -81,7 +83,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('world_name', default_value='aruco'),
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
-        DeclareLaunchArgument('ros_image_topic', default_value='/camera/image_raw'),
+        DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
+        DeclareLaunchArgument('use_rqt', default_value='true'),
         tvec_launch,
         aruco_static_tf_node,
         tvec_tf_node,

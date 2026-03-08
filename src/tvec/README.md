@@ -21,7 +21,7 @@ ros2 launch tvec tvec.launch.py world_name:=rover
 可选参数：
 - `world_name`：默认 `aruco`
 - `model_name`：默认 `x500_mono_cam_down_0`
-- `ros_image_topic`：默认 `/camera/image_raw`
+- `ros_image_topic`：默认 `/image_raw`
 
 单独启动 yaw 计算节点：
 ```bash

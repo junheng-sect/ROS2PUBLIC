@@ -12,6 +12,7 @@ def generate_launch_description():
     world_name = LaunchConfiguration('world_name')
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
+    use_rviz = LaunchConfiguration('use_rviz')
 
     tvec_tf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([FindPackageShare('tvec_tf'), '/launch/tvec_tf.launch.py']),
@@ -19,6 +20,7 @@ def generate_launch_description():
             'world_name': world_name,
             'model_name': model_name,
             'ros_image_topic': ros_image_topic,
+            'use_rviz': use_rviz,
         }.items(),
     )
 
@@ -41,7 +43,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('world_name', default_value='rover'),
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
-        DeclareLaunchArgument('ros_image_topic', default_value='/camera/image_raw'),
+        DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
+        DeclareLaunchArgument('use_rviz', default_value='false'),
         tvec_tf_launch,
         total_node,
     ])

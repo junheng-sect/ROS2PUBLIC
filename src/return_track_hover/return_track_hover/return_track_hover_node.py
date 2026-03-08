@@ -520,7 +520,9 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # 防止在 launch 收到 SIGINT 后重复 shutdown 引发 RCLError。
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

@@ -136,7 +136,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('world_name', default_value='aruco'),
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
-        DeclareLaunchArgument('ros_image_topic', default_value='/camera/image_raw'),
+        DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
         tvec_launch,
         matrix_marker_in_cam_node,
         matrix_cam_in_marker_node,

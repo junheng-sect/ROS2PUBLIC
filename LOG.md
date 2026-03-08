@@ -589,3 +589,252 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-08：新增文档 `src/offboard_test/README.md`，补充功能说明、话题、参数与运行命令。
 - 2026-03-08：更新 `src/offboard_test/setup.py`（入口点、launch/README 安装、维护者信息与描述）和 `src/offboard_test/package.xml`（`rclpy/geometry_msgs/mavros_msgs/launch/launch_ros` 依赖）。
 - 2026-03-08：执行 `colcon build --symlink-install --packages-select offboard_test` 构建通过；执行 `source install/setup.bash` 后运行 `ros2 launch offboard_test offboard_test.launch.py` 启动验证成功（测试中使用 `timeout` 自动停止）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：切换到 `rasip_pi_ws` 工作，阅读 `AGENTS.md` 和 `LOG.md` 熟悉要求与进度，配置本地 Git 以便在 IDE 中撤回代码，并执行一次构建。
+  解答：已完成：核对 `AGENTS.md/LOG.md` 后，在当前仓库写入本地 Git 撤回别名（`undo/unstage/discard/last`），并执行了全工作区 `colcon build --symlink-install` 与 `source install/setup.bash`。
+
+## 修改记录（本轮补充）
+### Git 仓库与远程
+- 2026-03-08：在 `rasip_pi_ws` 仓库补齐本地 Git 撤回别名：`undo=reset --soft HEAD~1`、`unstage=reset HEAD --`、`discard=checkout --`、`last=log -1 --stat`，用于 IDE/终端快速回退与撤销暂存。
+
+### 工作空间与协作规范
+- 2026-03-08：已阅读并确认当前仓库 `AGENTS.md` 与 `LOG.md` 的协作规范、记录方式和已有开发进度。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：准备切换到真机测试（不再仿真），可通过 SSH 连接树莓派；是否可以在 SSH 终端上调试机载代码？
+  解答：可以。可在已 SSH 登录的终端中由我直接给出并协助执行调试命令（环境检查、依赖核对、节点启动、话题/TF/日志排查、参数调优）。若需要我代执行，请提供可用 SSH 连接方式或在当前终端先完成 SSH 登录后继续。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：新增本轮问题与解答记录，确认后续切换真机联调流程（SSH 到树莓派后进行在线调试）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：提供树莓派 SSH 信息（`zjh@172.24.134.110`，密码 `123`）并要求尝试连接。
+  解答：已完成连接验证：网络 `ping` 可达，SSH 登录成功，远端环境为 Ubuntu 22.04.5（aarch64），并通过 `whoami/hostname/pwd` 确认当前用户与路径为 `zjh@zjh:/home/zjh`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：执行真机 SSH 连通性测试并完成登录验证，确认后续可在机载电脑终端继续联调。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：在树莓派 `~/project` 下创建 `rasip_pi_ws`，将远程仓库 `rasip_pi` 分支下载到该工作空间，并配置本地 Git 支持代码撤回。
+  解答：已通过 SSH 在树莓派完成：创建 `~/project`，克隆 `ROS2PUBLIC` 的 `rasip_pi` 分支到 `~/project/rasip_pi_ws`，并在该仓库写入本地 Git 撤回别名（`undo/unstage/discard/last`），验证当前分支跟踪 `origin/rasip_pi` 正常。
+
+## 修改记录（本轮补充）
+### Git 仓库与远程
+- 2026-03-08：在树莓派 `zjh@172.24.134.110` 创建工作空间目录 `~/project/rasip_pi_ws`，并执行 `git clone --branch rasip_pi --single-branch https://github.com/junheng-sect/ROS2PUBLIC.git ~/project/rasip_pi_ws`。
+- 2026-03-08：在树莓派 `~/project/rasip_pi_ws` 配置本地 Git 撤回别名：`undo=reset --soft HEAD~1`、`unstage=reset HEAD --`、`discard=checkout --`、`last=log -1 --stat`。
+- 2026-03-08：完成校验：当前分支 `rasip_pi`，远程为 `origin https://github.com/junheng-sect/ROS2PUBLIC.git`，状态为 `## rasip_pi...origin/rasip_pi`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：先不安装依赖，要求先列出需要安装的依赖清单。
+  解答：已在树莓派工作区执行依赖解析：由于 `rosdep` 未初始化（提示需先 `sudo rosdep init && rosdep update`），改为从 `package.xml` 提取依赖并剔除工作区内部包，给出外部依赖清单供手动安装。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：在树莓派 `~/project/rasip_pi_ws` 完成“仅解析不安装”的依赖梳理；确认 `rosdep` 当前未初始化。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：需要一条 apt 命令安装依赖。
+  解答：已给出 ROS 2 Humble 环境可直接执行的一行 `apt install` 命令，覆盖当前工作区外部依赖；并提示 `aruco_interfaces`、`rover_teleop_ackermann` 需源码或独立仓库提供。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：补充本轮问题与解答记录（依赖安装命令）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：执行一次 `colcon build` 并解决报错。
+  解答：已执行全工作区 `colcon build --symlink-install`，构建成功（18 个包全部完成），当前未出现构建报错；已执行 `source install/setup.bash`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：完成一次全工作区构建与环境加载验证；本轮未产生代码改动（无编译错误需修复）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：在树莓派 `zjh@zjh:~/project/rasip_pi_ws` 工作空间执行 `colcon build`。
+  解答：已通过 SSH 在树莓派执行 `source /opt/ros/humble/setup.bash && colcon build --symlink-install`，构建成功（18 个包完成，耗时约 1 分 37 秒）；随后执行 `source install/setup.bash` 成功。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：完成树莓派工作空间一次全量构建与环境加载验证（`sourced_ok`）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：树莓派启动 `ros2 launch mavros px4.launch` 时出现 `link[1000] open failed: DeviceError:serial:open: Permission denied`，要求排障并修复 MAVROS 连接。
+  解答：根因是串口设备 `/dev/ttyS0` 权限错误（原为 `crw--w---- root:tty`，缺少读权限），导致 MAVROS 以读写方式打开串口失败。已在树莓派修复为 `root:dialout 660`，并新增 udev 规则持久化；回归测试 `ros2 launch mavros px4.launch fcu_url:=/dev/serial0:921600` 后 `link[1000] opened successfully`，并收到 `HEARTBEAT, connected. FCU: PX4 Autopilot`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：完成树莓派 MAVROS 串口权限问题排查与修复，定位到 `/dev/ttyS0` 权限导致的 `Permission denied`。
+- 2026-03-08：在树莓派新增持久化规则 `/etc/udev/rules.d/99-px4-serial.rules`：`ttyS0/ttyAMA0 -> GROUP=dialout, MODE=0660`，并执行规则重载。
+- 2026-03-08：执行快速回归启动验证，确认 MAVROS 可正常打开串口并连接 PX4。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：准备实机测试 `landing` 与 `offboard_test`，是否无需修改；后续用相机时是否只需把图像来源从 Gazebo 改成 USB 摄像头。
+  解答：总体判断正确：`landing/offboard_test` 不依赖相机链路，可先直接实机测。需要额外确认 MAVROS 前缀一致性（当前 MAVROS 日志显示 `UAS Prefix: /uas1`，而节点默认订阅 `/mavros/...`）；若前缀不一致需在 launch 参数中改为 `/uas1/mavros/...`。后续接入视觉时，需将图像与相机标定链路从仿真源切换为 USB 实机源（图像、`camera_info`、frame/内参一致）。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：补充本轮实机测试前检查结论（`landing/offboard_test` 与相机链路解耦，需先核对 MAVROS 话题前缀）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：在树莓派工作空间新增 `return_landing` 功能包，组合 `return_home` 与 `landing`，按“先返航后降落”执行，并在测试无报错后结束。
+  解答：已完成：新增 `return_landing`（`ament_python`），实现单节点状态机 `ASCEND -> RETURN -> LAND -> TOUCHDOWN_DISARM -> DONE`，并新增 launch/README。已在本机与树莓派完成构建与 launch 启动验证，均无报错后停止。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_landing
+- 2026-03-08：在 `src/return_landing` 使用 `ros2 pkg create` 创建新包（Apache-2.0）。
+- 2026-03-08：新增 `src/return_landing/return_landing/return_landing_node.py`，实现返航+降落一体化状态机：
+  1) `ASCEND`：爬升到目标高度；
+  2) `RETURN`：按 GPS 回 home 点上方；
+  3) `LAND`：恒速下降并在接地准备阶段低速下压；
+  4) `TOUCHDOWN_DISARM`：落地后周期请求 disarm（含启发式兜底）；
+  5) `DONE`：检测 `armed=false` 后保持零速。
+- 2026-03-08：新增 `src/return_landing/launch/return_landing.launch.py`，统一配置 MAVROS 话题与控制参数。
+- 2026-03-08：新增 `src/return_landing/README.md`，补充流程、话题、运行命令与前缀注意事项。
+- 2026-03-08：更新 `src/return_landing/setup.py`（入口点、launch/README 安装）与 `src/return_landing/package.xml`（依赖与描述）。
+- 2026-03-08：完成本机构建验证：`colcon build --symlink-install` 通过；`ros2 launch return_landing return_landing.launch.py` 启动成功（测试使用 `timeout` 自动停止）。
+- 2026-03-08：同步到树莓派并完成实机侧验证：
+  1) `colcon build --symlink-install --packages-select return_landing` 通过；
+  2) `source install/setup.bash` 成功；
+  3) `ros2 launch return_landing return_landing.launch.py` 启动无报错后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：回到 laptop 的 `~/project/rasip_pi_ws` 工作目录。
+  解答：已切换并确认当前路径为 `/home/zjh/project/rasip_pi_ws`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：当前操作上下文已切换回 laptop 工作区 `~/project/rasip_pi_ws`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：`return_landing` 在 `LAND` 阶段长时间“接地准备中”，降落后无法 disarm；要求改为直接使用 `landing` 功能包中的下压油门 + disarm 方式。
+  解答：已修复：将 `return_landing` 的 `LAND` 末段逻辑改为与 `landing` 一致，支持 `ON_GROUND` 直接 disarm，以及 `landed_state` 不置位时启发式触发“最低油门下压 + 周期 disarm”兜底，避免卡在仅等待 landed_state。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### return_landing
+- 2026-03-08：更新 `src/return_landing/return_landing/return_landing_node.py` 的 `LAND` 阶段控制逻辑：
+  1) `is_landed_by_extended_state()` 为真时，直接 `try_send_disarm()`；
+  2) 启用与 `landing` 一致的启发式兜底分支：最低油门下压并按间隔周期发送 disarm；
+  3) 保留接地准备低速下压与常规下降分支，并增加与 `landing` 对齐的状态日志。
+- 2026-03-08：本机构建与启动验证通过：`colcon build --packages-select return_landing` 成功，`ros2 launch return_landing return_landing.launch.py` 无报错启动后停止。
+- 2026-03-08：已将修复同步至树莓派并完成构建、启动验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：要求将 `PI_LOG.md` 的修改记录格式对齐 `LOG.md`，采用“### 功能包修改记录”并按功能包小标题分组。
+  解答：已完成 `PI_LOG.md` 结构重排，统一为“实机/仿真分区 + 问题记录 + 修改记录 + 功能包修改记录（含固定记录要求）”，并将既有零散“本轮补充”条目合并归类。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：已按规范重构 `PI_LOG.md` 记录结构，新增并固定“功能包修改记录”分组写法。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：将 `project_ws` 中的 `camera_calibration_pkg` 迁移到当前工作空间并完成构建，后续用于连接 laptop 的 USB 相机进行标定。
+  解答：已完成迁移到 `rasip_pi_ws/src`，并按规范将小写 `readme.md` 改为 `README.md`；随后执行 `colcon build --symlink-install --packages-select camera_calibration_pkg` 与 `source install/setup.bash`，包已可被 `ros2 pkg list` 识别。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：将 `/home/zjh/project/project_ws/src/camera_calibration_pkg` 复制到 `/home/zjh/project/rasip_pi_ws/src/camera_calibration_pkg`。
+- 2026-03-08：按文档规范将 `src/camera_calibration_pkg/readme.md` 重命名为 `src/camera_calibration_pkg/README.md`。
+- 2026-03-08：执行 `colcon build --symlink-install --packages-select camera_calibration_pkg` 构建通过，并执行 `source install/setup.bash`；`ros2 pkg list` 已可查询到 `camera_calibration_pkg`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：进行摄像头标定是否需要知道标定板尺寸。
+  解答：需要。标定时必须提供标定板的真实几何尺寸（至少每个方格边长，常用单位 mm/m），否则内参中的焦距尺度和外参平移尺度不正确。仅做去畸变可先不依赖绝对尺度，但凡涉及距离/位姿估计都必须用真实尺寸。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：补充本轮标定问题与解答记录（无代码改动）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：USB 摄像头已连接，标定板单格尺寸 41mm、角点 7x5，要求修改标定功能包。
+  解答：已完成：将 `camera_calibration_pkg` 的标定默认参数改为 `size=7x5`、`square=0.041`（米），并将标定 launch 中图像 remap 改为可由 `camera_topic` 参数覆盖；已完成构建与 launch 启动验证，USB 摄像头成功识别。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：更新 `src/camera_calibration_pkg/launch/camera_calibration.launch.py`：
+  1) `square` 默认值由 `0.0216` 调整为 `0.041`；
+  2) 标定节点 `image` remap 改为 `LaunchConfiguration('camera_topic')`，支持按参数切换图像话题。
+- 2026-03-08：更新 `src/camera_calibration_pkg/camera_calibration_pkg/generate_checkerboard.py` 默认参数为 `cols=7`、`rows=5`、`square_size=0.041`（41mm）。
+- 2026-03-08：重写 `src/camera_calibration_pkg/README.md`，明确当前默认标定板参数与启动命令。
+- 2026-03-08：执行 `colcon build --symlink-install --packages-select camera_calibration_pkg` 并 `source install/setup.bash`。
+- 2026-03-08：执行 `ros2 launch camera_calibration_pkg camera_calibration.launch.py` 启动验证通过（`usb_cam` 成功打开 `/dev/video0`，测试后自动停止）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：不使用电脑内置摄像头，改用外接 USB 摄像头并尝试标定。
+  解答：已确认当前外接摄像头设备为 `/dev/video2`，并将标定 launch 增加 `video_device` 参数（默认 `/dev/video2`）；构建后启动验证日志显示 `Starting ... (/dev/video2)`，已实际走外接摄像头。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：更新 `src/camera_calibration_pkg/launch/camera_calibration.launch.py`，新增 launch 参数 `video_device`（默认 `/dev/video2`），并将 `usb_cam` 的 `video_device` 改为 `LaunchConfiguration('video_device')`。
+- 2026-03-08：更新 `src/camera_calibration_pkg/README.md`，补充 `video_device` 参数说明及外接摄像头启动示例。
+- 2026-03-08：执行 `colcon build --symlink-install --packages-select camera_calibration_pkg` 与 `source install/setup.bash`。
+- 2026-03-08：执行 `ros2 launch camera_calibration_pkg camera_calibration.launch.py` 启动验证通过；日志确认设备路径为 `/dev/video2`（外接 USB 摄像头）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：用户按命令启动时仍报 `usb_cam` 使用 `/dev/video0`，要求继续测试直到外接 USB 摄像头画面可显示。
+  解答：已本机复测通过：同命令下 `usb_cam` 实际打开 `/dev/video2`。问题根因判断为用户终端仍在旧环境（未加载当前工作区最新 install）。已给出“重新 source 当前工作区后再启动”的最小步骤。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：复测 `ros2 launch camera_calibration_pkg camera_calibration.launch.py video_device:=/dev/video2 size:=7x5 square:=0.041`，日志确认 `usb_cam` 使用 `/dev/video2` 启动成功。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：外接 USB 摄像头标定时 `usb_cam` 报 `Invalid v4l2 format` 且进程退出，导致标定结果未保存。
+  解答：根因有两层：
+  1) 设备号漂移（有时是 `/dev/video2`，有时变成 `/dev/video0`）；
+  2) 使用 `yuyv2rgb` 在该相机上不稳定。已修复为默认使用 `mjpeg2rgb`，并将 `video_device/image_width/image_height/framerate/pixel_format` 全部参数化；实测 `video_device:=/dev/video0 pixel_format:=mjpeg2rgb` 可稳定启动，无崩溃。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：更新 `src/camera_calibration_pkg/launch/camera_calibration.launch.py`：
+  1) `video_device` 默认改为 `/dev/video0`；
+  2) 新增可配参数 `image_width/image_height/framerate/pixel_format`；
+  3) `usb_cam` 参数改为全部由 launch 参数注入，默认 `pixel_format=mjpeg2rgb`。
+- 2026-03-08：更新 `src/camera_calibration_pkg/README.md`：补充外接 USB 摄像头设备号漂移处理方式、by-id 解析命令与推荐启动命令。
+- 2026-03-08：执行构建与回归验证：`colcon build --packages-select camera_calibration_pkg` 通过；`ros2 launch ... video_device:=/dev/video0 pixel_format:=mjpeg2rgb` 启动稳定，无 `Invalid v4l2 format` 崩溃。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：标定窗口点击 `CALIBRATE` 后卡死，`cameracalibrator` 进程退出（`exit code -9`），标定结果未保存。
+  解答：已将标定 launch 调整为低负载稳态参数，降低标定过程内存与计算压力：默认帧率改为 `15.0`，并新增 `calib_queue_size` 与 `max_chessboard_speed` 两个可调参数，默认分别为 `1` 与 `0.5`。同时更新 README 给出防卡死采样流程与进一步降载参数。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：更新 `src/camera_calibration_pkg/launch/camera_calibration.launch.py`：
+  1) `framerate` 默认值由 `30.0` 降为 `15.0`；
+  2) 新增 `calib_queue_size`（默认 `1`）与 `max_chessboard_speed`（默认 `0.5`）launch 参数；
+  3) 标定节点新增参数 `--queue-size` 与 `--max-chessboard-speed`，用于限制样本堆积和计算负载。
+- 2026-03-08：更新 `src/camera_calibration_pkg/README.md`：同步新参数说明、推荐启动命令，以及“点击 CALIBRATE 前进度条状态/采样数量/降分辨率降帧率”建议。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：之前标定后的数据是否有 `tar.gz` 文件，里面是否保存了照片。
+  解答：有。ROS 2 Humble 的 `camera_calibration` 在保存时会生成 `/tmp/calibrationdata.tar.gz`，其中包含采样图像与 `ost.yaml/ost.txt`；同时相机参数通常在 `~/.ros/camera_info/default_cam.yaml`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：按规范补充本轮“问题记录/修改记录”（无代码逻辑变更）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：`/tmp/calibrationdata.tar.gz` 解压后的文件在哪里。
+  解答：tar 包不会自动解压；解压目录由执行 `tar -xzf` 时的当前路径（或 `-C` 指定路径）决定。可用 `find` 或 `tar -tzf` 定位与查看内容。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08：补充本轮问题记录（无代码逻辑变更）。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：给出 `calibrationdata.tar.gz` 内容后，要求定位“解压后的文件在哪里”。
+  解答：原目录未检测到已解压文件；已在 `src/camera_calibration_pkg` 下创建 `calibrationdata_extracted` 并完成解压，确认包含 `left-0000.png ... left-0056.png`、`ost.yaml`、`ost.txt`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### camera_calibration_pkg
+- 2026-03-08：在 `src/camera_calibration_pkg` 执行解压操作：`tar -xzf calibrationdata.tar.gz -C calibrationdata_extracted`，用于定位并查看标定采样图片及 `ost` 文件。

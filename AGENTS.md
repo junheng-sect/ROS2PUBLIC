@@ -10,11 +10,13 @@
 - 🌍 **仿真**：Gazebo Harmonic（精通仿真环境搭建与通信）
 - 💻 **技能**：擅长编程，能根据需求编写带适当注释的代码
 
-**工作空间**：`~/project/zjh_ws`
+**工作空间**：`~/project/rasip_pi_ws`
 
 ## 协作与记录要求
 
 - 在本 `AGENTS.md` 中持续记录每次进行的修改。
+- 树莓派ssh用户名zjh，密码123，IP地址172.24.134.110
+- 在树莓派中的操作记录保存至PI_LOG.md中，实机和仿真分开。
 - 当前默认工作空间固定为 `~/project/zjh_ws`，后续操作均以该路径为准。
 - 创建功能包在把src路径下执行ros2 pkg create！
 - 问的问题也进行记录，开一栏新的标题“问题记录”里面写问的问题和解答。
@@ -44,6 +46,44 @@
 
 本仓库是一个基于 ROS 2  的工作空间，用于 ArUco 视觉与 PX4 无人机控制。
 支持仿真（Gazebo + RViz）和实机两类流程。
+
+## 实机usb摄像头参数
+image_width: 640
+image_height: 480
+camera_name: narrow_stereo
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [810.78076,   0.     , 346.24076,
+           0.     , 813.75141, 251.50143,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.410508, 0.102062, 0.001503, -0.000384, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [751.89913,   0.     , 350.54287,   0.     ,
+           0.     , 782.43472, 252.86193,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]
+
+## 实机aruco码和仿真aruco码尺寸
+
+### 仿真
+self.declare_parameter('marker_size_33', 0.5)
+self.declare_parameter('marker_size_42', 0.063)
+
+### 实机
+self.declare_parameter('marker_size_33', 0.5)
+self.declare_parameter('marker_size_42', 0.063)
 
 ## 工作空间结构
 

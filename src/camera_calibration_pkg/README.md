@@ -1,0 +1,57 @@
+# camera_calibration_pkg
+
+当前默认标定板参数（已按你的标定板设置）：
+- 内角点：`7x5`
+- 单格尺寸：`0.041` m（41 mm）
+
+## 启动标定
+
+```bash
+ros2 launch camera_calibration_pkg camera_calibration.launch.py
+```
+
+可选参数：
+- `camera_topic`：默认 `/image_raw`
+- `video_device`：默认 `/dev/video0`
+- `image_width`：默认 `640`
+- `image_height`：默认 `480`
+- `framerate`：默认 `15.0`（降低标定时卡死概率）
+- `pixel_format`：默认 `mjpeg2rgb`（外接 USB 摄像头推荐）
+- `size`：默认 `7x5`
+- `square`：默认 `0.041`
+- `calib_queue_size`：默认 `1`（建议保持 1）
+- `max_chessboard_speed`：默认 `0.5`（抑制高速移动样本）
+
+例如：
+
+```bash
+ros2 launch camera_calibration_pkg camera_calibration.launch.py video_device:=/dev/video0 pixel_format:=mjpeg2rgb image_width:=640 image_height:=480 framerate:=15.0 camera_topic:=/image_raw size:=7x5 square:=0.041 calib_queue_size:=1 max_chessboard_speed:=0.5
+```
+
+若设备号变化，先执行：
+
+```bash
+ls -l /dev/v4l/by-id
+```
+
+再将外接摄像头索引 0 解析成真实设备并启动：
+
+```bash
+VIDEO_DEV=$(readlink -f /dev/v4l/by-id/*video-index0)
+ros2 launch camera_calibration_pkg camera_calibration.launch.py video_device:=${VIDEO_DEV} pixel_format:=mjpeg2rgb image_width:=640 image_height:=480 framerate:=15.0 size:=7x5 square:=0.041 calib_queue_size:=1 max_chessboard_speed:=0.5
+```
+
+## 保存标定结果
+
+```bash
+ros2 run camera_calibration_pkg save_calibration
+```
+
+结果默认保存到：`~/.ros/camera_info/default_cam.yaml`
+
+建议：完成采样后在标定窗口点击 `CALIBRATE`，再点击 `SAVE` 保存内参。
+
+避免 `CALIBRATE` 卡死建议：
+1. 先让 X/Y/Size/Skew 四个进度条基本变绿，再点击 `CALIBRATE`。
+2. 采样数量控制在 30~60 组即可，不要长时间持续采集。
+3. 若仍卡死，可进一步降载：`framerate:=10.0 image_width:=320 image_height:=240`。

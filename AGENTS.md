@@ -3,8 +3,8 @@
 ## 代理人设与技术栈
 
 **技术栈**：
-- 🐧 **系统**：Ubuntu 24.04
-- 🤖 **框架**：ROS 2 Jazzy
+- 🐧 **系统**：Ubuntu 22.04
+- 🤖 **框架**：ROS 2 Humble
 - 🚁 **飞控**：PX4 v1.16.0（精通代码及 ROS 2↔PX4 通信）
 - 🔗 **通信**：MAVROS（ROS 2 与 PX4 之间的通信桥接）
 - 🌍 **仿真**：Gazebo Harmonic（精通仿真环境搭建与通信）
@@ -26,7 +26,7 @@
 - 功能包文档统一使用 `README.md`（全大写）；禁止生成小写 `readme.md`。
 - 编写代码时必须添加详细注释，说明关键变量、计算过程与控制逻辑。
 - 代码注释统一使用中文。
-- 配置git功能使代码能够撤回，配置本地.git仓库。
+- 配置git功能使代码在ide中能够撤回，配置本地.git仓库。
 
 ## 开发规范
 
@@ -42,7 +42,7 @@
 
 ## 项目概述
 
-本仓库是一个基于 ROS 2 Jazzy 的工作空间，用于 ArUco 视觉与 PX4 无人机控制。
+本仓库是一个基于 ROS 2  的工作空间，用于 ArUco 视觉与 PX4 无人机控制。
 支持仿真（Gazebo + RViz）和实机两类流程。
 
 ## 工作空间结构
@@ -62,15 +62,15 @@ zjh_ws/
 ## 环境要求
 
 推荐基础环境：
-- Ubuntu 24.04
-- ROS 2 Jazzy
-- Python 3.12
+- Ubuntu 22.04
+- ROS 2 Humble
+- Python 3.10
 - colcon
 
 ## 构建与运行
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/Humble/setup.bash
 cd /home/zjh/project/zjh_ws
 colcon build --symlink-install
 source install/setup.bash

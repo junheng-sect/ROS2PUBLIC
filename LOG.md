@@ -575,3 +575,17 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### Git 仓库与远程
 - 2026-03-08：在收到“成功”确认后执行提交与推送，上传本轮新增功能包与日志更新到 `origin/simple`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：新建功能包 `offboard_test`，要求进入 `OFFBOARD` 后以 `0.5m/s` 向南飞行 `10s`，随后悬停。
+  解答：已创建 `offboard_test`（`ament_python`），新增 `offboard_test_node`：监听 `/mavros/state`，在 `OFFBOARD` 上升沿启动任务；飞行阶段发布 `vy=-0.5`（ENU 下向南）持续 `10s`，到时后持续发布零速悬停。已完成构建与 launch 启动验证。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### offboard_test
+- 2026-03-08：在 `src/offboard_test` 使用 `ros2 pkg create` 创建 `ament_python` 功能包（Apache-2.0）。
+- 2026-03-08：新增节点 `src/offboard_test/offboard_test/offboard_test_node.py`，实现 OFFBOARD 门控、上升沿触发、向南定速飞行 10s、到时悬停的完整控制逻辑。
+- 2026-03-08：新增启动文件 `src/offboard_test/launch/offboard_test.launch.py`，默认参数为 `south_speed_mps=0.5`、`fly_duration_sec=10.0`。
+- 2026-03-08：新增文档 `src/offboard_test/README.md`，补充功能说明、话题、参数与运行命令。
+- 2026-03-08：更新 `src/offboard_test/setup.py`（入口点、launch/README 安装、维护者信息与描述）和 `src/offboard_test/package.xml`（`rclpy/geometry_msgs/mavros_msgs/launch/launch_ros` 依赖）。
+- 2026-03-08：执行 `colcon build --symlink-install --packages-select offboard_test` 构建通过；执行 `source install/setup.bash` 后运行 `ros2 launch offboard_test offboard_test.launch.py` 启动验证成功（测试中使用 `timeout` 自动停止）。

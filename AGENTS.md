@@ -83,8 +83,8 @@ self.declare_parameter('marker_size_33', 0.5)
 self.declare_parameter('marker_size_42', 0.063)
 
 ### 实机
-self.declare_parameter('marker_size_33', 0.5)
-self.declare_parameter('marker_size_42', 0.063)
+self.declare_parameter('marker_size_33', 0.193)
+self.declare_parameter('marker_size_42', 0.025)
 
 ## 工作空间结构
 

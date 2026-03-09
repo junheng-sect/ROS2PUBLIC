@@ -36,8 +36,8 @@ class TVecRVecNode(Node):
         self.declare_parameter('dist_p1', 0.001503)
         self.declare_parameter('dist_p2', -0.000384)
         self.declare_parameter('dist_k3', 0.0)
-        self.declare_parameter('marker_size_33', 0.5)
-        self.declare_parameter('marker_size_42', 0.063)
+        self.declare_parameter('marker_size_33', 0.193)
+        self.declare_parameter('marker_size_42', 0.025)
         self.declare_parameter('enable_csv_log', True)
         self.declare_parameter(
             'csv_log_path',

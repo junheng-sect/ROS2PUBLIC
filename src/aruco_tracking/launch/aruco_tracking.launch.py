@@ -13,9 +13,9 @@ def generate_launch_description():
     world_name = LaunchConfiguration('world_name')
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
-    use_rviz = LaunchConfiguration('use_rviz')
+    use_rqt = LaunchConfiguration('use_rqt')
 
-    # 启动视觉链路（图像桥接 + tvec + tf + rviz）。
+    # 启动视觉链路（USB 图像 + tvec + tf + rqt）。
     tvec_tf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare('tvec_tf'), '/launch/tvec_tf.launch.py']
@@ -24,7 +24,7 @@ def generate_launch_description():
             'world_name': world_name,
             'model_name': model_name,
             'ros_image_topic': ros_image_topic,
-            'use_rviz': use_rviz,
+            'use_rqt': use_rqt,
         }.items(),
     )
 
@@ -59,7 +59,7 @@ def generate_launch_description():
         DeclareLaunchArgument('world_name', default_value='rover'),
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
         DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
-        DeclareLaunchArgument('use_rviz', default_value='true'),
+        DeclareLaunchArgument('use_rqt', default_value='true'),
         tvec_tf_launch,
         tracking_node,
     ])

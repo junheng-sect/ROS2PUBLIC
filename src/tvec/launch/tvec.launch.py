@@ -49,8 +49,8 @@ def _launch_setup(context, *args, **kwargs):
             'dist_p1': 0.001503,
             'dist_p2': -0.000384,
             'dist_k3': 0.0,
-            'marker_size_33': 0.5,
-            'marker_size_42': 0.063,
+            'marker_size_33': 0.193,
+            'marker_size_42': 0.025,
         }],
     )
 
@@ -60,7 +60,9 @@ def _launch_setup(context, *args, **kwargs):
         executable='rqt_image_view',
         name='rqt_image_view_tvec',
         output='screen',
-        arguments=[LaunchConfiguration('annotated_image_topic')],
+        # rqt_image_view 默认订阅 /image，这里用 remap 固定到标注图像话题，
+        # 避免仅靠命令行参数导致“窗口打开但未订阅图像”。
+        remappings=[('/image', LaunchConfiguration('annotated_image_topic'))],
         condition=IfCondition(LaunchConfiguration('use_rqt')),
     )
 

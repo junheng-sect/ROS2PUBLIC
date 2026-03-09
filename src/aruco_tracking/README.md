@@ -21,7 +21,7 @@
 cd ~/project/zjh_ws
 colcon build --symlink-install --packages-select aruco_tracking
 source install/setup.bash
-ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover
+ros2 launch aruco_tracking aruco_tracking.launch.py
 ```
 
 ## 说明

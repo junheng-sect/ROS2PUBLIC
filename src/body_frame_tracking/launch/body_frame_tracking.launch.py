@@ -13,6 +13,7 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
 
+    # 复用现有视觉链路，避免改动原有包。
     tvec_tf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([FindPackageShare('tvec_tf'), '/launch/tvec_tf.launch.py']),
         launch_arguments={
@@ -22,20 +23,20 @@ def generate_launch_description():
         }.items(),
     )
 
-    total_node = Node(
-        package='total',
-        executable='total_node',
-        name='total_node',
+    tracking_node = Node(
+        package='body_frame_tracking',
+        executable='body_frame_tracking_node',
+        name='body_frame_tracking_node',
         output='screen',
         parameters=[{
-            'target_alt_m': 3.0,
-            'home_tolerance_m': 0.50,
-            'hover_after_align_sec': 1.0,
-            'lock_alt_on_offboard_entry': True,
-            'descent_speed_mps': 0.5,
-            'min_throttle_descent_speed_mps': 0.35,
-            'min_throttle_disarm_duration_sec': 5.0,
-            'disarm_retry_interval_sec': 1.0,
+            'pose_topic': '/debug/aruco_pose',
+            'state_topic': '/mavros/state',
+            'setpoint_raw_topic': '/mavros/setpoint_raw/local',
+            'target_x': 0.0,
+            'target_y': 0.0,
+            'target_yaw': 0.0,
+            'enable_z_hold': False,
+            'require_offboard': True,
         }],
     )
 
@@ -44,5 +45,5 @@ def generate_launch_description():
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
         DeclareLaunchArgument('ros_image_topic', default_value='/camera/image_raw'),
         tvec_tf_launch,
-        total_node,
+        tracking_node,
     ])

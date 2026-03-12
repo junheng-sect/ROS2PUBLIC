@@ -228,6 +228,8 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 问题记录（本轮补充）
 - 2026-03-07 | 问题：把 `project_ws` 中的 `rover_auto_motion` 功能包迁移到当前工作空间 `zjh_ws`。
   解答：已完成迁移：`/home/zjh/project/project_ws/src/rover_auto_motion -> /home/zjh/project/zjh_ws/src/rover_auto_motion`，并按规范删除小写 `readme.md`，仅保留 `README.md`。
+- 2026-03-09 | 问题：使用 `imagegen` 技能生成一张图片，解释在 `RETURN` 阶段如何由 GPS 经纬度近似计算东北向误差与返航距离。
+  解答：已读取 `imagegen` 技能说明并检查生成脚本，确认该任务应按 `infographic-diagram` 类型生成；当前终端环境缺少 `OPENAI_API_KEY`，暂时无法发起真实图片生成调用，待配置环境变量后可直接生成并输出到工作空间。
 
 ## 修改记录（本轮补充）
 ### 功能包修改记录
@@ -238,6 +240,9 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-07 | 问题：给定一段 `aruco_tracking` 日志，跟踪失败原因是什么？
   解答：从日志看是“控制方向与坐标系未完全一致导致目标越追越远 + 最终目标丢失触发视觉超时”。表现为：`err_marker.x` 从约 1m 持续增到 3m、`vy` 长时间打到限幅 `-0.800`，说明控制在持续推向错误方向或横向补偿不足；随后 `tvec_tf_node` 多秒输出完全相同数据，`tracking_node` 判定 `pose_timeout_sec` 超时进入零速悬停。根因可归纳为 `aruco_pose` 语义与 `/cmd_vel` 控制坐标系之间仍存在符号/旋转不一致，叠加速度限幅与视场边界后导致目标离开相机视野。
 - 2026-03-07 | 问题：希望无论 ArUco 坐标系 yaw 如何变化，无人机都能正确跟踪 xyz 和 yaw；当前 yaw 正常但 xy 输出固定在 E/N。
+
+#### 文档与图示
+- 2026-03-09：按用户要求启用 `imagegen` 技能准备生成“GPS 经纬度到局部东北向距离近似换算”示意图；已完成技能说明、CLI 与环境检查，确认当前受阻于 `OPENAI_API_KEY` 未设置，尚未生成最终图片文件。
   解答：已在 `aruco_tracking` 中将 XY 误差变换从“固定角旋转”改为“动态 yaw 旋转”，实时使用 `yaw_map_marker = yaw_map_base - yaw_marker_base`（`yaw_map_base` 来自 `/mavros/local_position/pose`，`yaw_marker_base` 来自 `/debug/aruco_pose.yaw`）；并新增本地位姿超时保护，超时时零速悬停。
 
 #### aruco_tracking
@@ -358,6 +363,70 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### 工作空间与协作规范
 - 2026-03-07 23:57:02 CST：按“每轮对话都记录”规则，新增“PX4 落地检测机制”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 00:47:40 CST | 问题：状态机是什么？
+  解答：状态机是一种把程序流程划分为多个明确状态，并按条件触发状态切换的控制方法；它强调“当前状态、该状态下的动作、切换条件”三部分。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 00:47:40 CST：按“每轮对话都记录”规则，新增“状态机是什么”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 10:53:56 CST | 问题：AI 提示词 `prompt` 是什么？
+  解答：`prompt` 是用户给 AI 的输入指令，用于说明任务目标、背景、约束和输出形式；提示越明确，生成结果通常越稳定、越贴近需求。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 10:53:56 CST：按“每轮对话都记录”规则，新增“AI 提示词 prompt 是什么”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 11:01:00 CST | 问题：介绍几个常用的 `skill` 并简单介绍功能。
+  解答：当前会话环境中可确认的常用 `skill` 有两个：`skill-creator` 用于创建或更新 skill，便于沉淀可复用工作流；`skill-installer` 用于安装 skill，可从预置列表或仓库导入以扩展能力。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 11:01:00 CST：按“每轮对话都记录”规则，新增“常用 skill 及功能简介”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 11:03:42 CST | 问题：简单介绍图中 `skill` 的功能。
+  解答：已根据截图中可见 skill 做分类说明，涵盖开发部署、设计前端、文档办公、自动化测试、代码协作与安全、平台集成及多模态生成等方向，并简要概括各自用途。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 11:03:42 CST：按“每轮对话都记录”规则，新增“截图中 skill 功能简介”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 11:06:15 CST | 问题：详细介绍一下 `Linear MCP` 和 `skill`。
+  解答：已说明两者层级差异：`Linear MCP` 属于基于 MCP 协议的外部系统接入层，用于让 AI 操作 Linear；`skill` 属于任务方法与工作流封装层，用于指导 AI 如何完成某类任务。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 11:06:15 CST：按“每轮对话都记录”规则，新增“Linear MCP 与 skill 详细介绍”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 11:09:54 CST | 问题：`Linear` 是干什么的？
+  解答：`Linear` 是面向软件研发团队的项目管理与 issue 跟踪平台，用于管理需求、缺陷、任务、迭代和项目进度，可理解为研发场景下的任务系统与协作平台。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 11:09:54 CST：按“每轮对话都记录”规则，新增“Linear 是干什么的”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 18:20:19 CST | 问题：`Windows` 系统能访问 `Ubuntu` 的文件吗？
+  解答：可以，但取决于场景；`WSL` 下可直接通过 `\\\\wsl$\\` 访问，双系统的原生 Linux 分区通常不能被 Windows 原生稳定读写，网络场景则可通过共享、SSH 或 SFTP 访问。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 18:20:19 CST：按“每轮对话都记录”规则，新增“Windows 是否能访问 Ubuntu 文件”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 18:20:40 CST | 问题：我是双系统。
+  解答：在双系统场景下，Windows 通常不能像访问 `NTFS` 一样稳定访问 Ubuntu 常用的 `ext4` 分区；更推荐使用共享数据分区、网络共享或 SFTP/SSH 方式交换文件，而不是让 Windows 直接写 Ubuntu 系统分区。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-08 18:20:40 CST：按“每轮对话都记录”规则，新增“双系统下 Windows 访问 Ubuntu 文件”的补充问答记录，并同步写入 `questions/LOG.md`。
 
 ## 问题记录（本轮补充）
 - 2026-03-07 | 问题：创建一个依赖 GPS 的返航功能包 `return_home`，流程为“先升到 3m，再飞回 home 点水平位置并悬停”。
@@ -575,3 +644,416 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### Git 仓库与远程
 - 2026-03-08：在收到“成功”确认后执行提交与推送，上传本轮新增功能包与日志更新到 `origin/simple`。
+
+## 问题记录（本轮补充）
+- 2026-03-08 | 问题：根据 `total_node.py` 中完整的自动降落流程，写一份论文片段初稿。
+  解答：已读取 `src/total/total/total_node.py` 与 `src/total/launch/total.launch.py`，基于其中的多阶段自动降落状态机、GPS 返航、ArUco 视觉对准、悬停确认、降落与 disarm 逻辑，生成论文片段初稿 `paper/total_auto_landing_paper_draft.md`。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-08：新增 `paper/total_auto_landing_paper_draft.md`，围绕 `total_node.py` 中的自动降落完整流程撰写论文片段初稿，包含状态机、控制律、落地判据与安全机制分析。
+- 2026-03-08：按“每轮对话都记录”规则，在“问题记录”中补充本轮“total 自动降落论文片段初稿生成”问答。
+
+## 问题记录（本轮补充）
+- 2026-03-09 11:16:34 CST | 问题：实机测试时 `rqt` 中的 USB 相机画面延迟约 `0.5s`，如果改成在地面站笔记本计算，并用图传模块回传图像信息，会不会有更好的性能？给一个合理方案。
+  解答：不建议把主视觉闭环迁到地面站。`rqt` 画面延迟通常主要来自显示链路，不等于算法链路同样慢；若改成图传到地面站再算再回传控制，端到端时延和抖动往往更差。更合理的方案是机载做视觉与控制闭环，地面站仅做监控、录包和非实时分析。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-09 11:16:34 CST：按“每轮对话都记录”规则，新增“实机图像延迟与地面站计算方案评估”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-09 13:13:45 CST | 问题：`/mavros/setpoint_attitude/cmd_vel` 和 `/mavros/setpoint_velocity/cmd_vel` 这两个话题有什么不同？
+  解答：两者控制层级不同；`setpoint_velocity/cmd_vel` 用于给飞控发送速度目标，属于较高层控制入口，飞控内部仍会完成姿态与执行器分配；`setpoint_attitude/cmd_vel` 更接近姿态/角速度层输入，控制更低层，通常用于更直接地干预姿态内环。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-09 13:13:45 CST：按“每轮对话都记录”规则，新增“MAVROS 姿态速度话题与线速度话题区别”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-09 13:19:42 CST | 问题：`setpoint_velocity/cmd_vel` 的输入量有哪些？是在哪个坐标系下的？
+  解答：该话题常用 `TwistStamped` 输入，核心量是 `linear.x/y/z` 与 `angular.z`；默认坐标系由 `mav_frame` 参数决定，在 MAVROS PX4 默认配置中通常为 `LOCAL_NED`，也可切到机体系如 `BODY_NED`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-09 13:19:42 CST：按“每轮对话都记录”规则，新增“setpoint_velocity/cmd_vel 输入量与坐标系”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-09 16:28:52 CST | 问题：GPS 的数据时间长了会漂吗？尤其是高度方向。
+  解答：会，且高度方向通常比水平更容易漂。普通 GPS 在静止状态下也会因卫星几何、噪声、多路径和大气误差产生位置抖动与慢漂，因此单靠 GPS 高度不适合做高精度定高或精确降落，通常需要气压计、测距、视觉或 RTK 等辅助。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-09 16:28:52 CST：按“每轮对话都记录”规则，新增“GPS 长时间漂移尤其是高度方向”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-09 16:28:52 CST | 问题：测试时让 GPS 和飞控一直通电，只在树莓派上反复启动/关闭程序；通电时间长后，原定高度 `3m`，进入 `OFFBOARD` 后无人机一直往上飞，重启 GPS 后恢复正常。这是不是 GPS 漂了？长时间运行有没有解决方案？
+  解答：更可能是 PX4 高度参考漂移，而不是 GPS 单独漂移。当前 `total_node.py` 用固定 `3m` 去跟踪 `/mavros/global_position/rel_alt`，该量属于融合后的相对高度；长时间通电后只要估计器高度参考发生偏移，进入 `OFFBOARD` 就会误判“高度不足”而继续爬升。更稳妥的办法是在每次任务启动时重置高度参考，或改用测距/视觉/RTK 等更稳定的低空高度源。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-09 16:28:52 CST：按“每轮对话都记录”规则，新增“长时间通电后进入 OFFBOARD 持续上升的原因与解决方案”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-09 | 问题：将 `total_node.py` 改成“进入 OFFBOARD 时锁定当前高度”。
+  解答：已完成：在 `OFFBOARD` 上升沿将当前 `rel_alt` 记录为高度参考 `alt_ref_m`，后续高度控制统一使用该锁定高度（若上升沿未拿到高度，则在 OFFBOARD 下首次收到 `rel_alt` 时补锁）。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### total
+- 2026-03-09：更新 `src/total/total/total_node.py`，新增参数 `lock_alt_on_offboard_entry`（默认 `True`）。
+- 2026-03-09：新增状态变量 `alt_ref_m`，在 `OFFBOARD` 上升沿锁定当前 `rel_alt` 作为全流程高度参考。
+- 2026-03-09：在 `rel_alt_callback` 增加“补锁”逻辑：若上升沿时无高度数据，待 OFFBOARD 下首次收到 `rel_alt` 后再锁定。
+- 2026-03-09：高度控制由固定 `target_alt_m` 改为“优先使用 `alt_ref_m`，否则回退 `target_alt_m`”。
+- 2026-03-09：更新 `src/total/launch/total.launch.py`，新增默认参数 `lock_alt_on_offboard_entry=True`。
+- 2026-03-09：更新 `src/total/README.md`，补充 OFFBOARD 锁高机制说明。
+- 2026-03-09：按规则完成验证：`colcon build --symlink-install --packages-select total`、`source install/setup.bash`、`ros2 launch total total.launch.py world_name:=rover` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-09 23:44:51 CST | 问题：提高二维码降落的精度，要让无人机精确落在二维码上，有哪些改进的方法？缩小控制死区？在下落过程中保持 `xy yaw` 跟踪？
+  解答：单独缩小死区不够，更有效的是分阶段精降策略：下降过程中持续保持 `xy+yaw` 闭环，随着高度下降逐步收紧误差阈值、降低速度上限和减小死区；同时改进低空高度感知、位姿滤波与触地前稳定判定，才能显著提高落点精度。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-09 23:44:51 CST：按“每轮对话都记录”规则，新增“提高二维码降落精度的方法”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-10 00:02:01 CST | 问题：帮我总结 `total` 中实现完整降落流程时，各个阶段使用的功能包有哪些？
+  解答：已按阶段梳理完整降落链路的功能包依赖：`ASCEND/RETURN` 主要用 `total + mavros`；视觉对准与降落阶段在此基础上叠加 `tvec_tf`、`tvec`、`tf_broadcast` 和 `debug_interface`。整体 launch 链路由 `total.launch.py -> tvec_tf.launch.py -> tvec/tf_broadcast/tvec_tf` 构成。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-10 00:02:01 CST：按“每轮对话都记录”规则，新增“total 完整降落流程各阶段功能包总结”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-10 00:33:07 CST | 问题：后续想把无人机在降落过程中的地面效应考虑进来，用于提升落地平稳程度。计划构造一个 `z` 方向加速度与高度的函数输入给飞控，以抵消地面效应并让落地瞬间速度为 `0`，请给一些建议。
+  解答：已建议采用“高度相关的下降轨迹 + 地面效应前馈补偿 + 低空闭环修正”的结构，而不是直接把单一 `a_z(h)` 函数裸输入飞控；对当前 MAVROS/PX4 上层控制链路，更实用的做法是分高度调度 `vz`、限制加速度/jerk，并结合测距或视觉高度在低空做更稳的垂向控制。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-10 00:33:07 CST：按“每轮对话都记录”规则，新增“地面效应补偿降落策略设计建议”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-10 00:45:53 CST | 问题：如果后续通过多次实验获得多条 `a_z-h` 曲线，并通过机器学习获得最佳曲线，这样的路线有没有可行性？
+  解答：有可行性，但更适合做成“数据驱动补偿模型”而不是完全黑盒控制器。建议用实验数据辨识一个轻量前馈模型，并保留原有闭环、限幅和安全回退；若只用单一 `a_z-h` 曲线，泛化能力可能不足，最好同时考虑 `v_z`、推力/油门、姿态等特征。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-10 00:45:53 CST：按“每轮对话都记录”规则，新增“基于实验和机器学习获得地面效应最佳曲线的可行性”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-10 00:58:40 CST | 问题：如果还会加入 `CFD` 仿真，通过简化模型（四个螺旋桨模仿机身上的相对位置，在不同高度下的升力系数），应该如何融入？
+  解答：建议把 `CFD` 作为先验建模工具融入，而不是直接替代实机数据。更合理的流程是：用简化四桨 CFD 提取不同高度下的升力增益或推力修正趋势，再用实机实验进行校正，最终将 `CFD + 实验` 融合为前馈补偿或低空下降调度模型。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-10 00:58:40 CST：按“每轮对话都记录”规则，新增“CFD 如何融入地面效应补偿路线”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-10 12:57:17 CST | 问题：把整个路线写成一份详细的计划书，以 `md` 文档的形式放在 `questions` 目录下。
+  解答：已新建计划书 `questions/ground_effect_landing_plan.md`，系统整理了地面效应补偿降落的研究背景、目标、技术路线、CFD 先验建模、实机实验辨识、数据驱动补偿模型、控制器融合、对比实验、风险控制与论文写作建议。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-10 12:57:17 CST：新增 `questions/ground_effect_landing_plan.md`，形成“地面效应补偿降落研究计划书”Markdown 文档。
+- 2026-03-10 12:57:17 CST：按“每轮对话都记录”规则，补充本轮“计划书输出到 questions 目录”的问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-11 19:05:53 CST | 问题：现在 `CFD/实验` 计划分三步：1) 做单桨不同转速推力测试，已得到幂函数拟合 `n=2.03`；2) 做单桨离地不同高度推力测试；3) 做四旋翼离地不同高度推力测试。这样的计划有没有问题，还有什么改进空间？
+  解答：总体顺序合理，但若仅做静态推力-高度测试，模型会缺少真实降落中的下降速度与非定常信息。建议在现有三步基础上补充“不同 `v_z` 条件下的动态下降测试/仿真”和“实机校正验证”，并尽量使用 `h/R`、`C_T`、推力增益比等无量纲指标统一分析单桨与四旋翼结果。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-11 19:05:53 CST：按“每轮对话都记录”规则，新增“CFD 三步实验计划评审与改进建议”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-11 19:11:38 CST | 问题：如何在仿真中实现螺旋桨下降？我使用的是 `STAR-CCM+`。
+  解答：已说明两种实现方式：一是以不同离地高度建立多个离散工况的准静态方法，适合当前地面效应曲线研究；二是采用非定常仿真加动态网格/运动区域实现连续下降，适合后续研究下降速度影响，但计算成本更高。对当前阶段建议优先使用多高度、多速度工况的离散方案。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-11 19:11:38 CST：按“每轮对话都记录”规则，新增“STAR-CCM+ 中实现螺旋桨下降仿真”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-11 19:20:27 CST | 问题：对于对准 ArUco 码降落的过程，可以有哪些评判标准，什么样的降落过程比较优秀？例如降落精度、降落时间、落地是否反弹等。给出一个参数化的评判标准。
+  解答：已给出面向 ArUco 精降的参数化评价体系，覆盖精度、过程质量、平稳性和可靠性四类指标，并建议用加权总分方法统一比较不同控制策略或参数组合。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-11 19:20:27 CST：按“每轮对话都记录”规则，新增“ArUco 精降过程参数化评价标准”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-11 19:37:45 CST | 问题：`h_rebound` 这个参数的测量是一个难点，有什么方法可以测量？
+  解答：已建议将 `h_rebound` 定义为“首次触地后再次离地的最大高度”，并推荐使用高速相机、动作捕捉系统或高频激光测距作为主要测量手段；在条件受限时，可结合机载测距/视觉高度和触地事件检测做近似估算。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-11 19:37:45 CST：按“每轮对话都记录”规则，新增“h_rebound 参数测量方法”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-11 19:44:00 CST | 问题：用 `e_land`、`e_yaw_td`、`v_z_td`、`h_rebound`、`T_total`、`P_success` 这六个参数，在 `questions` 目录写一个文档，写明各个指标的详细参数标准和最后的加权总分计算公式。
+  解答：已新建 `questions/aruco_landing_metrics.md`，系统整理了 6 个核心指标的定义、分档标准、归一化评分方式和综合加权总分公式，可直接用于精降实验评估与论文撰写。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-11 19:44:00 CST：新增 `questions/aruco_landing_metrics.md`，用于统一评估 ArUco 精确降落的核心指标与综合评分。
+- 2026-03-11 19:44:00 CST：按“每轮对话都记录”规则，补充本轮“六项指标评价文档输出”的问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-11 19:46:46 CST | 问题：反弹高度不太好测量，换成触地后姿态扰动 `theta_post`。这个应该可以通过飞行日志获得。
+  解答：已将 `aruco_landing_metrics.md` 中的 `h_rebound` 替换为 `theta_post`，并改为基于飞行日志姿态数据计算首次触地后短时间窗口内的最大姿态扰动。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-11 19:46:46 CST：更新 `questions/aruco_landing_metrics.md`，将评价指标 `h_rebound` 替换为 `theta_post`，并同步修改定义、分档标准、归一化评分与加权总分公式。
+
+## 问题记录（本轮补充）
+- 2026-03-12 00:20:20 CST | 问题：修改 ArUco 精确降落评价标准，增加“基线组 vs 补偿组”的对比规则。
+  解答：已为 `aruco_landing_metrics.md` 增补“基线组与补偿组对比规则”章节，补充了对比原则、对比方式、核心优势指标、优势判定标准和推荐结论模板。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-12 00:20:20 CST：更新 `questions/aruco_landing_metrics.md`，新增“基线组与补偿组对比规则”章节。
+
+## 问题记录（本轮补充）
+- 2026-03-12 00:23:28 CST | 问题：设计不考虑地面效应补偿时的 z 方向降落策略。
+  解答：已给出基线组 A 的 z 向降落策略：不引入地面效应补偿，仅采用常规分段 `v_z_ref` 调度与原有闭环控制，作为后续补偿策略的公平对照基线。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 00:23:28 CST：按“每轮对话都记录”规则，新增“不考虑地面效应补偿时的 z 方向降落策略设计”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 00:26:16 CST | 问题：速度从 `0.5` 到 `0.25` 再到 `0.1`，最后怎么变成 `0`？
+  解答：已说明基线策略不能只停留在三段固定下降速度，最后还需要极低空收敛段；建议在最底部高度区间采用 `v_z_ref = -k_h \cdot h` 一类渐近收敛形式，使 `h -> 0` 时 `v_z_ref -> 0`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 00:26:16 CST：按“每轮对话都记录”规则，新增“基线组 z 向速度如何最终收敛到 0”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 00:31:23 CST | 问题：把基线组 A 的降落策略写成 `questions` 目录下的一个文档。
+  解答：已新增 `questions/baseline_z_landing_strategy.md`，完整说明了不考虑地面效应补偿时的基线组 A z 向降落策略。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-12 00:31:23 CST：新增 `questions/baseline_z_landing_strategy.md`，用于描述基线组 A 的 z 向降落控制策略。
+
+## 问题记录（本轮补充）
+- 2026-03-12 13:39:28 CST | 问题：分析文件 `单桨不同高度.xlsx` 中的 CFD 仿真数据。
+  解答：已完成数据读取与拟合分析。结果显示该文件当前是“转速-推力”数据表，拟合关系为 `T = 3.2241e-07 * rpm^2.0366`，`R^2 = 0.999998`，可用于建立单桨基础推力模型，但暂不能用于不同高度地面效应分析。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 13:39:28 CST：按“每轮对话都记录”规则，新增“单桨 CFD Excel 数据分析”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 13:43:33 CST | 问题：更正后重新分析文件 `单桨不同高度.xlsx`，当前表为固定 `4000 rpm` 下的单桨不同离地高度数据，分析地面效应。
+  解答：已完成地面效应分析。结果表明：相对无穷远基准推力 `6.9836 N`，推力增益随高度下降逐渐增大，在 `h=0.3` 时约 `+3.22%`，`h=0.25` 时约 `+4.24%`，`h=0.2` 时约 `+5.85%`，说明单桨地面效应在 `h<=0.3` 区间明显增强。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 13:43:33 CST：按“每轮对话都记录”规则，新增“单桨不同高度 CFD 数据的地面效应分析”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 14:04:47 CST | 问题：现在已经有实机可以实验，是否可以简化 `CFD` 仿真，重点进行实机实验，用来构建 `T=f(n,h,v_z)` 的拟合关系？
+  解答：可以将重点转向实机，但不建议完全放弃 `CFD`。更合理的是保留轻量 `CFD` 或台架试验作为物理先验，再用实机数据做校正；同时建议实机拟合的目标优先设为“等效补偿模型”而不是直接从飞行日志恢复绝对推力真值。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 14:04:47 CST：按“每轮对话都记录”规则，新增“是否可简化 CFD 并转向实机拟合 `T=f(n,h,v_z)`”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 14:08:23 CST | 问题：上述做的两个表格的 `CFD` 计算够了吗？
+  解答：若目标是提供基础物理依据并支撑后续实机研究，这两个表格已基本够用；若目标是直接构建完整的 `T=f(n,h,v_z)` 模型或直接支撑控制器设计，则还不够，仍需补充不同转速、不同下降速度及多旋翼干扰工况。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 14:08:23 CST：按“每轮对话都记录”规则，新增“当前两组 CFD 表格是否足够”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 14:17:57 CST | 问题：设计实机实验。初步想法是：1) 做近地不同高度的悬停实验，获得各个电机的平均转速获得 `T=f(h)`；2) 做不同速度匀速降落的实验，取同一时刻的高度和电机转速，获得 `T=f(h,v_z)`；3) 给无人机增加配重，重复 1、2 实验，获得 `T=f(n,h,v_z)`。这样的实验设计有没有问题？给出改进建议和方案。
+  解答：总体路线可行，但需避免将自由飞行中的平均电机转速直接视为绝对推力真值。更合理的做法是将实验分成静态近地悬停、准稳态匀速下降和不同载荷迁移验证三层，并把最终拟合目标定义为“等效地面效应增益/补偿模型”，同时补充姿态、电压和环境条件等记录字段。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 14:17:57 CST：按“每轮对话都记录”规则，新增“地面效应实机实验设计评审与改进建议”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 14:27:23 CST | 问题：把修改后的实机实验设计写一个文档。
+  解答：已新增 `questions/real_flight_ground_effect_experiment_plan.md`，用于系统说明地面效应补偿的实机实验设计方案。
+
+## 修改记录（本轮补充）
+### 文档与论文
+- 2026-03-12 14:27:23 CST：新增 `questions/real_flight_ground_effect_experiment_plan.md`，整理修正后的实机实验设计方案。
+
+## 问题记录（本轮补充）
+- 2026-03-12 14:41:34 CST | 问题：控制量 `u` 应该怎么测得？
+  解答：已说明 `u` 应具体定义为可获取的等效控制量，而非抽象量。优先推荐使用飞控日志中的总油门或归一化推力指令；若无法直接获取，则可用四电机转速构造与总升力单调对应的等效输入，如平方和均值。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 14:41:34 CST：按“每轮对话都记录”规则，新增“控制量 u 如何测得”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 14:47:17 CST | 问题：从当前 `mavros` 话题列表看，有总推力指令吗？
+  解答：当前话题列表中没有一个明确可直接当作“PX4 内部总推力指令输出”的标准话题。`/mavros/setpoint_attitude/thrust` 属于外部输入设定，`/mavros/actuator_control` 更偏底层执行器控制组，若要定义实验中的等效控制量，仍更建议基于 ESC 转速构造总输入代理量。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12 14:47:17 CST：按“每轮对话都记录”规则，新增“MAVROS 话题中是否存在总推力指令”的问答记录，并同步写入 `questions/LOG.md`。
+- 2026-03-12 16:34:32 CST：按“每轮对话都记录”规则，新增“ArUco 对准时，动态 yaw 旋转到 ENU 与直接机体系速度输出的效果比较”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-11 20:03:21 CST | 问题：帮我设计不考虑地面效应和考虑地面效应的两种落地策略，通过加入地面效应补偿控制项，能够有指标能够体现加入地面效应补偿项的优势。
+  解答：已设计基线策略 A（无地面效应补偿）和补偿策略 B（低空加入地面效应前馈/调度补偿）两套降落方案，并指出 `v_z_td`、`theta_post`、`P_success` 是最能体现补偿优势的核心指标，`e_land` 与 `T_total` 可作为补充对比项。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-11 20:03:21 CST：按“每轮对话都记录”规则，新增“无补偿与地面效应补偿两种降落策略设计”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-11 23:51:55 CST | 问题：如果策略 A 和策略 B 的目标都是以 `v_z=0` 着陆，那如何展现引入地面效应补偿项的优势？
+  解答：已说明优势不在于“终点目标不同”，而在于“实现该目标的过程质量不同”。即使两者都追求 `v_z=0`，仍可通过实际触地速度均值与方差、低空速度波动、姿态扰动、控制动作幅度和成功率来体现地面效应补偿的价值。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-11 23:51:55 CST：按“每轮对话都记录”规则，新增“同为 `v_z=0` 目标时如何体现地面效应补偿优势”的问答记录，并同步写入 `questions/LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-10 | 问题：创建新功能包 `land_with_tracking`，流程为“先对齐 ArUco，再以 0.5m/s 下落且持续 xy+yaw 闭环，最后执行 landing 的下压与 disarm 逻辑”。
+  解答：已完成：新增 `land_with_tracking` 包并实现单节点状态机 `ALIGN -> HOVER_BEFORE_LAND -> DESCEND_WITH_TRACK -> TOUCHDOWN_DISARM -> DONE`，满足“对齐-悬停-闭环下降-下压解锁”全流程。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-10：新建功能包 `src/land_with_tracking`（`ament_python`，Apache-2.0），补齐依赖（`mavros_msgs/debug_interface/geometry_msgs/std_msgs/tvec_tf` 等）。
+- 2026-03-10：新增主节点 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py`，实现任务状态机：
+  1) `ALIGN`：先对齐 ArUco（严格阈值 `xy<=0.10m`、`yaw<=5deg`、持续 `1.0s`）；
+  2) `HOVER_BEFORE_LAND`：对齐成功后悬停 `1.0s`；
+  3) `DESCEND_WITH_TRACK`：以 `vz=-0.5m/s` 下降并持续执行 `xy+yaw` 闭环；
+  4) `TOUCHDOWN_DISARM`：最低油门下压并按周期发送 disarm；
+  5) `DONE`：`armed=false` 后任务结束。
+- 2026-03-10：在节点中复用动态 yaw 误差旋转与 MAVROS QoS 适配（`BEST_EFFORT + VOLATILE`），并集成 disarm 节流重试逻辑。
+- 2026-03-10：新增启动文件 `src/land_with_tracking/launch/land_with_tracking.launch.py`，默认包含 `tvec_tf.launch.py`，可一键拉起视觉链路与控制节点。
+- 2026-03-10：新增 `src/land_with_tracking/README.md`（大写），说明阶段流程、默认判据、话题与运行命令。
+- 2026-03-10：更新 `src/land_with_tracking/setup.py`、`src/land_with_tracking/package.xml`，补齐入口点、launch/README 安装项与描述。
+- 2026-03-10：按规则执行验证：
+  1) `colcon build --symlink-install --packages-select land_with_tracking` 通过；
+  2) `source install/setup.bash` 已执行；
+  3) `ros2 launch land_with_tracking land_with_tracking.launch.py world_name:=rover` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：现有链路通过动态 yaw 变换后输出 ENU 速度指令，要求新建一个独立功能包，直接在机体坐标系输出速度指令，且不改动原有功能包。
+  解答：已新增独立功能包 `body_frame_tracking`，直接发布 `FRAME_BODY_NED` 速度指令到 `/mavros/setpoint_raw/local`，不修改原有任何功能包，原链路可继续独立使用。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### body_frame_tracking
+- 2026-03-12：新建功能包 `src/body_frame_tracking`（`ament_python`，Apache-2.0），补齐依赖（`rclpy/mavros_msgs/debug_interface/launch/launch_ros/tvec_tf`）。
+- 2026-03-12：新增节点 `src/body_frame_tracking/body_frame_tracking/body_frame_tracking_node.py`：
+  1) 订阅 `/debug/aruco_pose` 与 `/mavros/state`；
+  2) 直接在机体误差坐标下做 `x/y/yaw` PID；
+  3) 发布 `mavros_msgs/msg/PositionTarget` 到 `/mavros/setpoint_raw/local`，`coordinate_frame=FRAME_BODY_NED`；
+  4) 对 `vy/vz` 做 FLU->BODY_NED 符号转换；
+  5) 保留 OFFBOARD 门控与视觉超时零速保护。
+- 2026-03-12：新增启动文件 `src/body_frame_tracking/launch/body_frame_tracking.launch.py`，默认包含 `tvec_tf.launch.py` 并启动新节点。
+- 2026-03-12：新增文档 `src/body_frame_tracking/README.md`（大写），说明机体系输出、符号转换、话题与运行方式。
+- 2026-03-12：更新 `src/body_frame_tracking/setup.py` 与 `src/body_frame_tracking/package.xml`，补齐入口点、launch/README 安装项与描述。
+- 2026-03-12：按规则执行验证：
+  1) `colcon build --symlink-install --packages-select body_frame_tracking` 通过；
+  2) `source install/setup.bash` 已执行；
+  3) `ros2 launch body_frame_tracking body_frame_tracking.launch.py world_name:=rover` 启动验证通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：机体坐标系按 FLU（xyz）测试时，`body_frame_tracking` 的 y 方向控制量反了。
+  解答：已修正 `body_frame_tracking_node.py` 中 y 轴误差符号，按实测将 y 方向控制反向后输出。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### body_frame_tracking
+- 2026-03-12：更新 `src/body_frame_tracking/body_frame_tracking/body_frame_tracking_node.py`，将 y 轴误差由 `target_y - pose.y` 改为 `pose.y - target_y`，以修正 FLU 语义下 y 控制方向反向问题。
+- 2026-03-12：按规则执行 `colcon build --symlink-install --packages-select body_frame_tracking` 与 `source install/setup.bash`。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：执行 `aruco_tracking` 和 `body_frame_tracking` 时，分别会拉起哪些节点？
+  解答：已按 launch 文件核对：两者都会包含 `tvec_tf.launch.py` 的整套视觉链路节点；区别仅在各自新增的控制节点不同：`aruco_tracking_node` vs `body_frame_tracking_node`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12：按“每轮对话都记录”规则，补充一次“节点拉起清单查询”的问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：在正常实现功能的前提下，想最小化性能消耗，应该只保留哪些节点？
+  解答：若目标是“视觉闭环控制可用且性能最省”，应去掉 RViz、额外 TF 广播与日志节点，仅保留图像桥接、Aruco检测、`aruco_pose` 计算和单个控制节点。仿真下最小组合通常为：`gz_bridge_image`、`tvec_rvec_node`、`tvec_tf_node` +（`aruco_tracking_node` 或 `body_frame_tracking_node` 二选一）。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12：按“每轮对话都记录”规则，补充一次“最小节点保留策略”的问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：在不破坏当前功能包功能的情况下，新增两个功能包，使用最小可用组合，分别使用 `aruco_tracking_node` 和 `body_frame_tracking_node`。
+  解答：已完成：新增 `aruco_tracking_minimal` 与 `body_frame_tracking_minimal` 两个独立包，均采用最小链路（`gz_bridge_image + tvec_rvec_node + tvec_tf_node + 控制节点`），不修改原有功能包。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### aruco_tracking_minimal
+- 2026-03-12：新建功能包 `src/aruco_tracking_minimal`（`ament_python`，Apache-2.0）。
+- 2026-03-12：新增启动文件 `src/aruco_tracking_minimal/launch/aruco_tracking_minimal.launch.py`，最小链路只拉起：
+  1) `gz_bridge_image`；
+  2) `tvec_rvec_node`；
+  3) `tvec_tf_node`；
+  4) `aruco_tracking_node`。
+- 2026-03-12：新增 `src/aruco_tracking_minimal/README.md`，说明最小组合与运行方式。
+- 2026-03-12：更新 `src/aruco_tracking_minimal/setup.py`、`package.xml`，补齐 launch/README 安装与描述。
+
+#### body_frame_tracking_minimal
+- 2026-03-12：新建功能包 `src/body_frame_tracking_minimal`（`ament_python`，Apache-2.0）。
+- 2026-03-12：新增启动文件 `src/body_frame_tracking_minimal/launch/body_frame_tracking_minimal.launch.py`，最小链路只拉起：
+  1) `gz_bridge_image`；
+  2) `tvec_rvec_node`；
+  3) `tvec_tf_node`；
+  4) `body_frame_tracking_node`。
+- 2026-03-12：新增 `src/body_frame_tracking_minimal/README.md`，说明最小组合与运行方式。
+- 2026-03-12：更新 `src/body_frame_tracking_minimal/setup.py`、`package.xml`，补齐 launch/README 安装与描述。
+
+#### 构建与验证
+- 2026-03-12：按规则执行 `colcon build --symlink-install --packages-select aruco_tracking_minimal body_frame_tracking_minimal` 与 `source install/setup.bash`。
+- 2026-03-12：按规则执行启动验证：
+  1) `ros2 launch aruco_tracking_minimal aruco_tracking_minimal.launch.py world_name:=rover` 启动通过后停止；
+  2) `ros2 launch body_frame_tracking_minimal body_frame_tracking_minimal.launch.py world_name:=rover` 启动通过后停止。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：如果要调节 tracking 中 XY 和 yaw 的 PID 参数，应该记录哪些数据？
+  解答：建议至少同步记录“误差、控制输出、系统状态、约束触发”四类数据：`/debug/aruco_pose`（x/y/yaw 原始误差源）、控制命令话题（`/mavros/setpoint_velocity/cmd_vel` 或 `/mavros/setpoint_raw/local`）、飞控状态（`/mavros/state`）以及本机位姿（`/mavros/local_position/pose`）；并保留时间戳用于对齐和评估时延。若有节点内日志，需同时记录 `err_marker/err_cmd`、限幅/死区触发与数据超时信息。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-12：按“每轮对话都记录”规则，新增一次“tracking PID 调参数据记录项”问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-12 | 问题：把“记录调节 tracking 的关键数据并导出 CSV”的功能加入两个 minimal 功能包。
+  解答：已完成：在 `aruco_tracking_minimal` 和 `body_frame_tracking_minimal` 中分别新增 CSV 记录节点，并默认由各自 launch 拉起；可按参数配置目录、前缀和采样率，运行后自动生成 CSV 文件。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### aruco_tracking_minimal
+- 2026-03-12：新增 `src/aruco_tracking_minimal/aruco_tracking_minimal/csv_logger_node.py`，订阅 `/debug/aruco_pose`、`/mavros/state`、`/mavros/local_position/pose`、`/mavros/setpoint_velocity/cmd_vel`，按固定频率写入 CSV（含新鲜度、消息时延、位姿与控制量）。
+- 2026-03-12：更新 `src/aruco_tracking_minimal/setup.py`，新增入口点 `csv_logger_node`。
+- 2026-03-12：更新 `src/aruco_tracking_minimal/package.xml`，补齐 `geometry_msgs`、`mavros_msgs`、`debug_interface` 依赖。
+- 2026-03-12：更新 `src/aruco_tracking_minimal/launch/aruco_tracking_minimal.launch.py`，默认拉起 CSV logger，并新增参数：`enable_csv_logger`、`csv_output_dir`、`csv_prefix`、`csv_sample_rate_hz`。
+- 2026-03-12：更新 `src/aruco_tracking_minimal/README.md`，新增 CSV 记录说明与示例命令。
+
+#### body_frame_tracking_minimal
+- 2026-03-12：新增 `src/body_frame_tracking_minimal/body_frame_tracking_minimal/csv_logger_node.py`，订阅 `/debug/aruco_pose`、`/mavros/state`、`/mavros/local_position/pose`、`/mavros/setpoint_raw/local`，按固定频率写入 CSV（含 `PositionTarget` 关键字段）。
+- 2026-03-12：更新 `src/body_frame_tracking_minimal/setup.py`，新增入口点 `csv_logger_node`。
+- 2026-03-12：更新 `src/body_frame_tracking_minimal/package.xml`，补齐 `geometry_msgs`、`mavros_msgs`、`debug_interface` 依赖。
+- 2026-03-12：更新 `src/body_frame_tracking_minimal/launch/body_frame_tracking_minimal.launch.py`，默认拉起 CSV logger，并新增参数：`enable_csv_logger`、`csv_output_dir`、`csv_prefix`、`csv_sample_rate_hz`。
+- 2026-03-12：更新 `src/body_frame_tracking_minimal/README.md`，新增 CSV 记录说明与示例命令。
+
+#### 构建与验证
+- 2026-03-12：按规则执行 `colcon build --symlink-install --packages-select aruco_tracking_minimal body_frame_tracking_minimal`，构建通过。
+- 2026-03-12：按规则执行 `source install/setup.bash`。
+- 2026-03-12：按规则执行启动验证并停止：
+  1) `ros2 launch aruco_tracking_minimal aruco_tracking_minimal.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`（logger 启动成功并生成 CSV）；
+  2) `ros2 launch body_frame_tracking_minimal body_frame_tracking_minimal.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`（logger 启动成功并生成 CSV）。

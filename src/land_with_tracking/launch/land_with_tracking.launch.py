@@ -13,6 +13,7 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
 
+    # 默认包含视觉链路，保证一键启动可直接执行任务。
     tvec_tf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([FindPackageShare('tvec_tf'), '/launch/tvec_tf.launch.py']),
         launch_arguments={
@@ -22,16 +23,16 @@ def generate_launch_description():
         }.items(),
     )
 
-    total_node = Node(
-        package='total',
-        executable='total_node',
-        name='total_node',
+    node = Node(
+        package='land_with_tracking',
+        executable='land_with_tracking_node',
+        name='land_with_tracking_node',
         output='screen',
         parameters=[{
-            'target_alt_m': 3.0,
-            'home_tolerance_m': 0.50,
+            'xy_align_tolerance_m': 0.10,
+            'yaw_align_tolerance_deg': 5.0,
+            'align_hold_sec': 1.0,
             'hover_after_align_sec': 1.0,
-            'lock_alt_on_offboard_entry': True,
             'descent_speed_mps': 0.5,
             'min_throttle_descent_speed_mps': 0.35,
             'min_throttle_disarm_duration_sec': 5.0,
@@ -44,5 +45,5 @@ def generate_launch_description():
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
         DeclareLaunchArgument('ros_image_topic', default_value='/camera/image_raw'),
         tvec_tf_launch,
-        total_node,
+        node,
     ])

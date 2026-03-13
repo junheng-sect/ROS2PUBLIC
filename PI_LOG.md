@@ -152,3 +152,130 @@
 - 2026-03-08：树莓派执行 `colcon build --packages-select tvec tvec_tf aruco_tracking` 通过。
 - 2026-03-08：安装 `ros-humble-rqt-image-view`，`ros2 pkg list` 已可查询到 `rqt_image_view`。
 - 2026-03-08：全局检查 `src/*/launch/*.py` 已无 `rviz2` 节点声明。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：更新树莓派 SSH 地址。
+  解答：已将工作区 `AGENTS.md` 中树莓派地址从 `172.24.134.110` 更新为 `10.250.57.110`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-13：更新 SSH 连接信息：`zjh@10.250.57.110`（密码保持 `123`）。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：同步 `simple` 分支中的 4 个功能包到笔记本与树莓派，并构建测试到无报错。
+  解答：已完成。`body_frame_tracking_minimal`、`body_frame_tracking`、`aruco_tracking_minimal`、`land_with_tracking` 已同步到两端并验证通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### 从 simple 分支同步
+- 2026-03-13：在 laptop 和树莓派工作空间执行 `git fetch origin simple`，并检出以下目录到 `rasip_pi_ws/src`：
+  `body_frame_tracking_minimal`、`body_frame_tracking`、`aruco_tracking_minimal`、`land_with_tracking`。
+
+#### 构建与验证
+- 2026-03-13：laptop 执行 `colcon build --symlink-install --packages-select body_frame_tracking_minimal body_frame_tracking aruco_tracking_minimal land_with_tracking` 通过。
+- 2026-03-13：树莓派执行同样构建命令通过。
+- 2026-03-13：两端分别对 4 个 launch 执行限时启动验证，日志无 `ERROR`、`Traceback`、`process has died`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将新同步的 4 个功能包图像链路从 GZ bridge 切换为 USB 相机链路。
+  解答：已完成。`aruco_tracking_minimal` 与 `body_frame_tracking_minimal` 已移除 `parameter_bridge`，统一复用 `tvec_tf/tvec` 的 USB 相机链路。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### aruco_tracking_minimal
+- 2026-03-13：`launch/aruco_tracking_minimal.launch.py` 改为包含 `tvec_tf.launch.py`；删除 `gz bridge + 本地 tvec + 本地 tvec_tf` 直接启动逻辑。
+- 2026-03-13：新增 `use_rqt` 参数透传，默认图像话题改为 `/image_raw`。
+
+#### body_frame_tracking_minimal
+- 2026-03-13：`launch/body_frame_tracking_minimal.launch.py` 改为包含 `tvec_tf.launch.py`；删除 `gz bridge + 本地 tvec + 本地 tvec_tf` 直接启动逻辑。
+- 2026-03-13：新增 `use_rqt` 参数透传，默认图像话题改为 `/image_raw`。
+
+#### body_frame_tracking / land_with_tracking
+- 2026-03-13：两个 launch 新增 `use_rqt` 参数透传至 `tvec_tf`，默认 `ros_image_topic` 统一为 `/image_raw`。
+
+#### 构建与验证
+- 2026-03-13：本地构建通过：`aruco_tracking_minimal`、`body_frame_tracking_minimal`、`body_frame_tracking`、`land_with_tracking`、`tvec`、`tvec_tf`。
+- 2026-03-13：4 个 launch 限时启动验证通过，日志显示均由 `usb_cam_node_exe` 提供图像，未出现 `parameter_bridge`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：禁用 `aruco_tracking_minimal` 与 `body_frame_tracking_minimal` 中无用的 `map_aruco_static_tf_node`，并将 rqt 默认关闭。
+  解答：已完成。两个包已改为仅启动 `tvec` 与 `tvec_tf_node`，不再通过 `tvec_tf.launch.py` 拉起静态 TF；`use_rqt` 默认值为 `false`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### aruco_tracking_minimal / body_frame_tracking_minimal
+- 2026-03-13：launch 结构由“包含 `tvec_tf.launch.py`”改为“包含 `tvec.launch.py` + 单独启动 `tvec_tf_node`”。
+- 2026-03-13：默认参数 `use_rqt` 从 `true` 改为 `false`。
+
+#### 构建与验证
+- 2026-03-13：laptop 与树莓派分别构建通过：`aruco_tracking_minimal`、`body_frame_tracking_minimal`、`tvec`、`tvec_tf`。
+- 2026-03-13：两端启动验证日志均确认：不再出现 `map_aruco_static_tf_node`、不再出现 `rqt_image_view`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：两个 minimal 功能包启动时提示未收到 `/debug/tvec` 数据。
+  解答：已定位为启动初期的正常等待提示。实测两包均可持续收到并发布 `aruco_pose`，视觉链路正常。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-13：在树莓派对 `aruco_tracking_minimal` 与 `body_frame_tracking_minimal` 分别抓取启动日志，确认 `tvec_tf_node` 连续输出 `aruco_pose`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：`land_with_tracking` 不要启动静态 TF 发布节点与 rqt。
+  解答：已完成。该包 launch 已切换为仅启动 `tvec` 与 `tvec_tf_node`，默认 `use_rqt=false`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-13：`launch/land_with_tracking.launch.py` 从包含 `tvec_tf.launch.py` 改为包含 `tvec.launch.py` 并单独启动 `tvec_tf_node`。
+- 2026-03-13：`use_rqt` 默认值改为 `false`。
+
+#### 构建与验证
+- 2026-03-13：laptop 与树莓派均完成 `colcon build --packages-select land_with_tracking tvec tvec_tf`。
+- 2026-03-13：两端启动验证日志仅包含 `usb_cam_node_exe`、`tvec_rvec_node`、`tvec_tf_node`、`land_with_tracking_node`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：两个 minimal 功能包的 CSV 文件存储到 `rasip_pi_ws/log`。
+  解答：已完成，默认目录统一为 `/home/zjh/project/rasip_pi_ws/log/tracking_csv`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### aruco_tracking_minimal / body_frame_tracking_minimal
+- 2026-03-13：`launch/*.launch.py` 中 `csv_output_dir` 默认值改为 `~/project/rasip_pi_ws/log/tracking_csv`。
+- 2026-03-13：`csv_logger_node.py` 中 `output_dir` 参数默认值改为 `/home/zjh/project/rasip_pi_ws/log/tracking_csv`。
+- 2026-03-13：README 中 CSV 默认路径与示例命令同步更新。
+
+#### 构建与验证
+- 2026-03-13：laptop 与树莓派均完成构建并启动验证，日志显示 CSV 输出路径已切换到 `rasip_pi_ws/log/tracking_csv`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：在 launch 命令中如何调 PID 参数。
+  解答：可使用 `--ros-args -p` 直接覆盖节点参数，已提供实测建议参数命令模板。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：`ros2 launch` 下用 `--ros-args -p` 修改 PID 失败。
+  解答：已改为标准 launch 参数覆盖方案；现在可直接在命令中使用 `kp_xy:=...` 等参数。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### body_frame_tracking_minimal / aruco_tracking_minimal
+- 2026-03-13：两个 launch 新增 PID 与死区参数声明并传入控制节点，支持命令行直接覆盖。
+- 2026-03-13：README 新增 PID 调参命令示例。
+
+#### 构建与验证
+- 2026-03-13：laptop 与树莓派均构建通过并验证 `kp_xy:=...` 参数命令可正常启动。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：分析多组 body_frame_tracking 实测 CSV，确定当前最优参数并给出下一步调试方向。
+  解答：已完成。当前最佳组合为 `kpxy=1.0,kdxy=0.05`；高 `kdxy`（0.2）会显著放大抖动，降低到 0.05 后性能明显提升。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-13：完成 8 份 CSV 的统一量化评估与排序，输出下一步调参路径（优先围绕 `kpxy` 与 `kdxy` 做小步细化，后续再单独调 yaw 与死区）。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：对多组 PID 实验 CSV 进行作图对比，展示 tracking 优劣。
+  解答：已完成，输出多维指标对比图与综合评分图。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-13：生成 `tracking_metrics_compare.png`、`tracking_composite_score.png`、`tracking_timeseries_key_runs.png`、`summary_metrics.tsv`。

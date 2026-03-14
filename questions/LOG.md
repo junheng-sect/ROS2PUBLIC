@@ -224,3 +224,33 @@
 
 - 问题：在 `tvec` 对准 ArUco 码时，通过动态 yaw 变换后把速度指令变换到 `ENU` 坐标系，和直接在机体坐标系下输出速度指令，哪个效果更好、精度更高？
 - 解答：结论不是绝对的，但对“纯视觉对准 ArUco 并持续精确降落”这类任务，直接在机体坐标系下输出速度指令通常更稳、更直接，实际精度往往也更高一些。原因是 ArUco 相对误差天然先在相机/机体相关坐标系里表达，直接在机体系闭环可以少一层由航向角估计、时延和坐标变换带来的误差；如果 yaw 在变化，机体系控制也更直观。不过，如果飞控接口只稳定支持局部坐标系速度输入，或者任务需要和全局返航/地图导航统一，那么先用动态 yaw 将误差旋转到 `ENU` 再发局部速度命令会更方便，而且在 yaw 准确、变换正确、时延很小的前提下，两者理论上可以接近等价。工程上可总结为：纯近距视觉伺服优先机体系；需要与全局导航统一时再转到 `ENU`。
+
+## 2026-03-14 12:40:16 CST
+
+- 问题：阅读远程仓库 `simple` 分支和 `rasip` 分支中的 `LOG`、子目录 `log` 以及 `PILOG` 等日志文件，提炼常见问题（如 QoS 不匹配、仿真迁移实机相机输入问题），并在 `questions` 目录写一份文档。
+- 解答：已完成日志归纳并写入 `questions/common_issues_from_simple_rasip_logs.md`。分析范围覆盖 `origin/simple:LOG.md`、`origin/simple:questions/LOG.md`、`origin/rasip_pi:LOG.md`、`origin/rasip_pi:PI_LOG.md`（远程未发现 `rasip` 分支，实际对应 `rasip_pi`）。文档已按“现象-根因-修复”总结高频问题，重点包括：QoS 兼容、MAVROS 前缀不一致、仿真到 USB 相机链路迁移、`v4l2`/像素格式、`numpy-cv_bridge` 兼容、串口权限、坐标系符号错误、OFFBOARD 门控超时、降落后 disarm 卡住、高度参考漂移、launch 参数覆盖方式、旧环境未 source 等，并附实机前检查清单。
+
+## 2026-03-14 12:48:05 CST
+
+- 问题：把常见问题和解决方案写入 `AGENTS`，新开一栏标题。
+- 解答：已在 `AGENTS.md` 新增章节 **“常见问题与解决方案（跨分支日志沉淀）”**，并写入可执行条目：QoS 不匹配、MAVROS 前缀不一致、仿真迁移实机相机链路、USB 设备号与像素格式、`cv_bridge/numpy` 兼容、串口权限、坐标系符号、OFFBOARD 超时门控、LAND 阶段 disarm 卡住、高度参考漂移、launch 参数覆盖方式、构建后未 source 等。
+
+## 2026-03-14 21:06:46 CST
+
+- 问题：`Position` 模式下，摇杆的输入映射的是目标速度吗？
+- 解答：基本上是。对 PX4 多旋翼 `Position` 模式来说，横滚/俯仰摇杆通常不会直接绕过位置控制器去控姿态，而是先转成水平速度目标；偏航摇杆对应偏航角速度或航向变化，油门杆通常对应垂向速度或高度变化请求。飞控再通过位置环和速度环把这些目标转成姿态与推力。中位回杆后，水平速度目标回到零，飞控会把当前位置“接住”，继续做定点悬停。所以更准确地说：`Position` 模式下摇杆主要映射的是“期望运动量（以速度为主）”，不是直接映射成最终姿态输出。
+
+## 2026-03-14 21:23:25 CST
+
+- 问题：使用这些二维码 tracking 功能包时是不是不需要 MAVROS 的全部功能？启动 MAVROS 时能不能只启动部分节点来减少机载电脑负载？启动 MAVROS 后机器会变卡，VNC 色彩显示也会出问题。
+- 解答：可以，二维码 tracking 通常不需要 MAVROS 全部插件全开。Jazzy 版 MAVROS 的 `px4.launch` 已支持通过 `pluginlists_yaml` 控制插件加载，因此可以做“最小插件集”减负载。对当前常见 tracking 链路：若使用 `/mavros/state`、`/mavros/local_position/pose` 并发布 `/mavros/setpoint_velocity/cmd_vel`，通常只需要保留 `sys_status`、`local_position`、`setpoint_velocity`，必要时再加 `command`；若用 `body_frame_tracking` 发布 `/mavros/setpoint_raw/local`，则把 `setpoint_velocity` 换成 `setpoint_raw`。只有 `total/return` 这类返航流程才额外需要 `global_position` 和 `home_position`。因此完全可以关闭 mission、geofence、ftp、gimbal、adsb、mount、px4flow、image_pub、distance_sensor 等无关插件。至于“启动 MAVROS 后整机变卡、VNC 颜色异常”，更像是机载电脑 CPU/内存/图形链路被压住，而不是 MAVROS 单纯逻辑错误；减插件、关闭不必要的话题发布、减少 VNC 下高刷新图像显示，通常都会明显改善。
+
+## 2026-03-14 21:34:05 CST
+
+- 问题：帮我做一个包含该工作空间下所有功能包要使用插件的最小集合的 MAVROS 启动。
+- 解答：已完成。新建独立功能包 `mavros_profiles`，未修改系统安装目录下的 MAVROS 文件。包内新增 `launch/workspace_minimal_px4.launch.py` 与 `config/workspace_minimal_pluginlists.yaml`，为当前工作空间中所有实际依赖 MAVROS 的功能包提供最小插件集合。最终保留的插件为：`sys_*`、`command`、`local_position`、`global_position`、`home_position`、`setpoint_velocity`、`setpoint_raw`，覆盖 `/mavros/state`、`/mavros/extended_state`、`/mavros/local_position/pose`、`/mavros/local_position/velocity_local`、`/mavros/global_position/global`、`/mavros/global_position/rel_alt`、`/mavros/home_position/home`、`/mavros/setpoint_velocity/cmd_vel`、`/mavros/setpoint_raw/local` 与 `/mavros/cmd/arming` 等当前工作空间实际接口。已完成 `colcon build --symlink-install --packages-select mavros_profiles`、`source install/setup.bash` 和 `timeout 8s ros2 launch mavros_profiles workspace_minimal_px4.launch.py` 启动验证；日志确认仅上述目标插件被加载，其余大部分插件被忽略。
+
+## 2026-03-15 00:06:35 CST
+
+- 问题：已经删除 `gitpat.md`，为什么 `git push -u origin simple` 仍然被 GitHub Push Protection 拦截？
+- 解答：原因是密钥虽然已在当前工作区删除，但仍然存在于待推送提交历史中。检查结果显示：`origin/simple..simple` 之间还有两个本地提交待推送，其中前一个提交 `0f5bfe3` 仍然包含 `gitpat.md`，后一个提交 `f1d97b8` 只是把该文件删除。因此 GitHub 在扫描整条待推送提交链时，依然会在 `0f5bfe3` 里发现 PAT 并拒绝推送。也就是说，问题不在“当前目录还有没有这个文件”，而在“待推送历史里有没有这个密钥”。要解决，必须重写这两个本地提交，使 `gitpat.md` 从待推送历史中彻底消失；同时该 PAT 已视为泄露，建议立即在 GitHub 侧撤销并重新生成。

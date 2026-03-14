@@ -93,6 +93,56 @@ ros2 topic list
 - 保持仿真与实机的话题命名、坐标系约定一致。
 - 在控制节点中加入安全参数（超时、限幅、失效保护等）。
 
+## 常见问题与解决方案（跨分支日志沉淀）
+
+- **QoS 不匹配导致“节点在跑但无数据”**
+  - 现象：订阅无回调、无报错。
+  - 方案：MAVROS 高频状态类话题优先用 `BEST_EFFORT + VOLATILE`；`home` 等 latched 数据考虑 `TRANSIENT_LOCAL`。
+
+- **MAVROS 前缀不一致（`/mavros` vs `/uas1/mavros`）**
+  - 现象：控制节点启动正常但完全无效。
+  - 方案：所有话题前缀参数化；启动前执行 `ros2 topic list | rg mavros` 确认实际前缀。
+
+- **仿真迁移实机时相机链路未切干净**
+  - 现象：launch 正常但没有图像或 ArUco 检测不到。
+  - 方案：从 `gz bridge` 切到 `usb_cam`；统一图像话题到 `/image_raw`；保证 `camera_info` 使用实机标定参数。
+
+- **USB 摄像头格式/设备号问题**
+  - 现象：`Invalid v4l2 format`、相机偶发打不开。
+  - 方案：像素格式优先 `mjpeg2rgb`；设备路径参数化；优先使用 `/dev/v4l/by-id/...` 避免 `videoX` 漂移。
+
+- **`cv_bridge` 与 `numpy` 兼容性冲突**
+  - 现象：报 `_ARRAY_API not found` 等 Python 运行错误。
+  - 方案：将 `numpy` 固定到 ROS 兼容版本（历史记录中 `1.26.4` 可用），并在目标环境重新验证相机链路。
+
+- **MAVROS 串口权限导致无法连接飞控**
+  - 现象：`DeviceError:serial:open: Permission denied`。
+  - 方案：将串口权限修正为 `root:dialout 660`，并添加 udev 规则持久化。
+
+- **坐标系/符号混用导致跟踪反向或绕圈**
+  - 现象：`yaw` 正常但 `xy` 越调越偏或某轴反向。
+  - 方案：先统一 FLU/ENU/NED/body 语义；单轴阶跃验证正负方向；必要时加入动态 yaw 旋转补偿并记录 `err_marker/err_cmd`。
+
+- **OFFBOARD 门控与视觉/位姿超时引发零速保护**
+  - 现象：飞行中控制指令突然归零。
+  - 方案：显式状态机门控：非 OFFBOARD、视觉超时、本地位姿超时均归零；恢复后再进入闭环。
+
+- **降落末段卡在 LAND，已接地但不 disarm**
+  - 现象：长时间“接地准备中”。
+  - 方案：在保留 `ON_GROUND` 优先的同时，增加“最低油门下压 + 周期 disarm”兜底分支。
+
+- **长时间通电后高度参考漂移**
+  - 现象：进入 OFFBOARD 后持续上升或高度控制异常。
+  - 方案：在 OFFBOARD 上升沿锁定本次任务高度参考；低空尽量使用测距/视觉高度，不仅依赖 GPS 相对高度。
+
+- **launch 参数覆盖方式误用**
+  - 现象：`--ros-args -p` 传参看似成功但未生效。
+  - 方案：对 launch 声明参数使用 `kp_xy:=...` 形式覆盖，避免与节点参数覆盖方式混用。
+
+- **构建后未 `source` 导致“改了不生效”**
+  - 现象：仍读取旧参数/旧设备默认值。
+  - 方案：每次构建后执行 `source install/setup.bash`，必要时新开终端复验。
+
 
 ## 日志文件
 

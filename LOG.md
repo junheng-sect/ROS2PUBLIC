@@ -1032,6 +1032,62 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-12：按“每轮对话都记录”规则，新增一次“tracking PID 调参数据记录项”问答记录。
 
 ## 问题记录（本轮补充）
+- 2026-03-14 12:40:16 CST | 问题：阅读远程仓库 `simple` 与 `rasip` 分支中的 `LOG`、子目录日志及 `PILOG`，整理常见问题并在 `questions` 目录输出文档。
+  解答：已完成。基于远程 `origin/simple` 与 `origin/rasip_pi` 的日志内容，归纳形成常见问题总结文档 `questions/common_issues_from_simple_rasip_logs.md`，覆盖 QoS 不匹配、MAVROS 前缀、仿真迁移实机相机输入、USB 设备与像素格式、依赖兼容、串口权限、坐标系/符号、OFFBOARD 门控、落地 disarm、高度参考漂移等高频问题，并附排障清单。
+
+## 修改记录（本轮补充）
+### 文档与日志
+- 2026-03-14 12:40:16 CST：新增问题总结文档 `questions/common_issues_from_simple_rasip_logs.md`，来源为 `origin/simple:LOG.md`、`origin/simple:questions/LOG.md`、`origin/rasip_pi:LOG.md`、`origin/rasip_pi:PI_LOG.md`。
+- 2026-03-14 12:40:16 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+
+## 问题记录（本轮补充）
+- 2026-03-14 12:48:05 CST | 问题：把常见问题和解决方案写入 `AGENTS`，新开一栏标题。
+  解答：已完成。在 `AGENTS.md` 新增章节 **“常见问题与解决方案（跨分支日志沉淀）”**，集中固化 QoS、MAVROS 前缀、仿真迁移实机相机、USB 设备/像素格式、`cv_bridge/numpy` 兼容、串口权限、坐标系符号、OFFBOARD 超时、LAND disarm、高度参考漂移、launch 参数覆盖、构建后 source 等高频问题及对应修复动作。
+
+## 修改记录（本轮补充）
+### 文档与日志
+- 2026-03-14 12:48:05 CST：更新 `AGENTS.md`，新增“常见问题与解决方案（跨分支日志沉淀）”栏目。
+- 2026-03-14 12:48:05 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+
+## 问题记录（本轮补充）
+- 2026-03-14 21:06:46 CST | 问题：`Position` 模式下，摇杆的输入映射的是目标速度吗？
+  解答：基本是。PX4 多旋翼 `Position` 模式中，横滚/俯仰摇杆通常先映射为水平速度目标，偏航摇杆对应偏航变化，油门杆对应垂向运动请求；飞控再通过位置环和速度环把这些目标转成姿态与推力。中位回杆后速度目标回零，当前位置被锁成新的定点目标。
+
+## 问题记录（本轮补充）
+- 2026-03-14 21:23:25 CST | 问题：使用二维码 tracking 功能包时是否需要 MAVROS 全部功能，能否只启动部分插件减轻机载负载；启动 MAVROS 后机器变卡且 VNC 色彩异常。
+  解答：可以裁剪。Jazzy 版 MAVROS 的 `px4.launch` 支持 `pluginlists_yaml`，可仅保留 tracking 需要的最小插件集。对 `aruco_tracking` 类速度控制链路，通常保留 `sys_status`、`local_position`、`setpoint_velocity`，必要时加 `command` 即可；对 `body_frame_tracking` 则将 `setpoint_velocity` 换成 `setpoint_raw`。只有返航/total 等流程才需要额外的 `global_position` 与 `home_position`。mission、gimbal、ftp、adsb、distance_sensor、image_pub、px4flow 等多数插件可关闭。启动后整机变卡与 VNC 颜色异常更像是系统资源占用过高导致，减插件、减少无关话题与图像显示负担通常会改善。
+
+## 问题记录（本轮补充）
+- 2026-03-14 21:34:05 CST | 问题：帮我做一个包含该工作空间下所有功能包要使用插件的最小集合的 MAVROS 启动。
+  解答：已完成。新建独立配置包 `mavros_profiles`，在工作空间内提供最小 MAVROS 启动而不修改系统安装目录。新增 `launch/workspace_minimal_px4.launch.py` 与 `config/workspace_minimal_pluginlists.yaml`，保留插件为 `sys_*`、`command`、`local_position`、`global_position`、`home_position`、`setpoint_velocity`、`setpoint_raw`，覆盖当前工作空间所有依赖 MAVROS 的功能包所需接口。已完成单包构建、环境加载与限时启动验证，日志确认仅目标插件被加载，其余插件被忽略。
+
+## 修改记录（本轮补充）
+### 文档与日志
+- 2026-03-14 21:06:46 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+- 2026-03-14 21:23:25 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+
+### 功能包修改记录
+#### mavros_profiles
+- 2026-03-14：使用 `ros2 pkg create` 新建功能包 `src/mavros_profiles`（`ament_python`，Apache-2.0）。
+- 2026-03-14：新增 `src/mavros_profiles/config/workspace_minimal_pluginlists.yaml`，采用“全禁用 + 仅允许最小插件集”策略。
+- 2026-03-14：新增 `src/mavros_profiles/launch/workspace_minimal_px4.launch.py`，复用系统 `mavros/launch/node.launch` 并注入工作空间内的最小插件表。
+- 2026-03-14：新增 `src/mavros_profiles/README.md`，说明目标插件集、覆盖范围和启动方法。
+- 2026-03-14：更新 `src/mavros_profiles/package.xml`、`src/mavros_profiles/setup.py`，补齐 `launch/launch_ros/mavros` 依赖和 launch/config/README 安装项。
+
+#### 构建与验证
+- 2026-03-14：执行 `colcon build --symlink-install --packages-select mavros_profiles`，构建通过。
+- 2026-03-14：执行 `source install/setup.bash`。
+- 2026-03-14：执行 `timeout 8s ros2 launch mavros_profiles workspace_minimal_px4.launch.py` 启动验证通过；日志确认仅 `command`、`global_position`、`home_position`、`local_position`、`setpoint_raw`、`setpoint_velocity`、`sys_status`、`sys_time` 被加载，其余插件均被忽略。
+
+## 问题记录（本轮补充）
+- 2026-03-15 00:06:35 CST | 问题：已经删除 `gitpat.md`，为什么 `git push` 仍然被 GitHub Push Protection 拦截？
+  解答：已确认原因是密钥仍存在于待推送的提交历史里，而不只是当前工作区文件是否存在。当前 `simple` 相对 `origin/simple` 还多出两个本地提交：`0f5bfe3` 和 `f1d97b8`，其中 `0f5bfe3` 仍包含 `gitpat.md`，`f1d97b8` 只是将其删除。GitHub 会扫描整条待推送提交链，因此仍会在 `0f5bfe3` 中发现 PAT 并拒绝推送。解决方式是重写本地提交历史，把该文件从待推送提交中彻底移除；同时建议立即撤销该 PAT。
+
+## 修改记录（本轮补充）
+### 文档与日志
+- 2026-03-15 00:06:35 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+
+## 问题记录（本轮补充）
 - 2026-03-12 | 问题：把“记录调节 tracking 的关键数据并导出 CSV”的功能加入两个 minimal 功能包。
   解答：已完成：在 `aruco_tracking_minimal` 和 `body_frame_tracking_minimal` 中分别新增 CSV 记录节点，并默认由各自 launch 拉起；可按参数配置目录、前缀和采样率，运行后自动生成 CSV 文件。
 
@@ -1057,3 +1113,23 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-12：按规则执行启动验证并停止：
   1) `ros2 launch aruco_tracking_minimal aruco_tracking_minimal.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`（logger 启动成功并生成 CSV）；
   2) `ros2 launch body_frame_tracking_minimal body_frame_tracking_minimal.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`（logger 启动成功并生成 CSV）。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：直接帮忙安装 Ubuntu 蓝牙驱动。
+  解答：已远程执行硬件与服务诊断，确认 `bluetooth.service` 运行、`btusb/btmtk` 模块已加载，但控制器 `hci0` 处于 `DOWN` 且 `BD Address` 为全 0，表现为固件/初始化未完成；由于当前会话无法输入本机 sudo 密码，系统级安装与重载步骤需用户本机执行一次提权命令后继续。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：按“每轮对话都记录”规则，补充一次“蓝牙驱动安装与诊断”问答记录（未修改功能包代码）。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：提供 sudo 密码后，要求直接完成 Ubuntu 蓝牙驱动安装。
+  解答：已代执行安装与驱动重载：`bluez/bluez-tools/rfkill/linux-firmware` 安装完成，`btusb/btmtk` 模块已加载；但硬件仍报 `Bluetooth: hci0: Opcode 0x0c03 failed: -110`，表现为 `hci0 DOWN` 且 `BD Address=00:00:00:00:00:00`，属于设备初始化超时，当前需进一步做冷重启/内核回退或 BIOS 电源管理项排查。
+
+## 修改记录（本轮补充）
+### 系统运维记录
+- 2026-03-14：在主机执行蓝牙环境安装与排障：
+  1) 安装/确认 `bluez`、`bluez-tools`、`rfkill`、`linux-firmware`；
+  2) 重载 `btusb/btmtk/bluetooth` 模块并重启 `bluetooth.service`；
+  3) 尝试 USB 设备 `13d3:3596` 解绑/重绑与 `btusb` 参数调优（`reset=0`、`enable_autosuspend=0`）；
+  4) 结果：控制器仍未完成初始化，日志持续出现 `Opcode 0x0c03 failed: -110`。

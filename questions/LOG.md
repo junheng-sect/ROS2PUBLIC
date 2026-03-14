@@ -254,3 +254,8 @@
 
 - 问题：已经删除 `gitpat.md`，为什么 `git push -u origin simple` 仍然被 GitHub Push Protection 拦截？
 - 解答：原因是密钥虽然已在当前工作区删除，但仍然存在于待推送提交历史中。检查结果显示：`origin/simple..simple` 之间还有两个本地提交待推送，其中前一个提交 `0f5bfe3` 仍然包含 `gitpat.md`，后一个提交 `f1d97b8` 只是把该文件删除。因此 GitHub 在扫描整条待推送提交链时，依然会在 `0f5bfe3` 里发现 PAT 并拒绝推送。也就是说，问题不在“当前目录还有没有这个文件”，而在“待推送历史里有没有这个密钥”。要解决，必须重写这两个本地提交，使 `gitpat.md` 从待推送历史中彻底消失；同时该 PAT 已视为泄露，建议立即在 GitHub 侧撤销并重新生成。
+
+## 2026-03-15 00:11:14 CST
+
+- 问题：帮我把这条分支整理干净。
+- 解答：已完成本地 `simple` 分支清理。处理方式是将分支软重置到 `origin/simple`，保留实际文件改动，再重新提交一次，从而彻底移除原先包含 `gitpat.md` 的待推送历史。清理后，`origin/simple..simple` 之间只剩一个新的本地提交 `9997748 feat: add workspace MAVROS minimal profiles and docs`，工作区已恢复干净；同时对最新提交执行了关键字检索，未再发现 `github_pat` / `ghp_` 等 PAT 痕迹。注意：原 PAT 已属于泄露状态，仍建议立即在 GitHub 上撤销并重新生成。

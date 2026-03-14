@@ -1083,9 +1083,14 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-15 00:06:35 CST | 问题：已经删除 `gitpat.md`，为什么 `git push` 仍然被 GitHub Push Protection 拦截？
   解答：已确认原因是密钥仍存在于待推送的提交历史里，而不只是当前工作区文件是否存在。当前 `simple` 相对 `origin/simple` 还多出两个本地提交：`0f5bfe3` 和 `f1d97b8`，其中 `0f5bfe3` 仍包含 `gitpat.md`，`f1d97b8` 只是将其删除。GitHub 会扫描整条待推送提交链，因此仍会在 `0f5bfe3` 中发现 PAT 并拒绝推送。解决方式是重写本地提交历史，把该文件从待推送提交中彻底移除；同时建议立即撤销该 PAT。
 
+## 问题记录（本轮补充）
+- 2026-03-15 00:11:14 CST | 问题：帮我把这条分支整理干净。
+  解答：已完成。将本地 `simple` 分支软重置到 `origin/simple`，保留真实文件改动并重新提交，从而移除原先含有 `gitpat.md` 的两次待推送提交历史。清理后 `origin/simple..simple` 之间仅剩一个新提交 `9997748`，工作区恢复干净，并对最新提交执行了 PAT 关键字检索，未再发现 `github_pat` / `ghp_` 痕迹。仍建议尽快撤销原 PAT。
+
 ## 修改记录（本轮补充）
 ### 文档与日志
 - 2026-03-15 00:06:35 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+- 2026-03-15 00:11:14 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
 
 ## 问题记录（本轮补充）
 - 2026-03-12 | 问题：把“记录调节 tracking 的关键数据并导出 CSV”的功能加入两个 minimal 功能包。

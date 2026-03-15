@@ -1138,3 +1138,220 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
   2) 重载 `btusb/btmtk/bluetooth` 模块并重启 `bluetooth.service`；
   3) 尝试 USB 设备 `13d3:3596` 解绑/重绑与 `btusb` 参数调优（`reset=0`、`enable_autosuspend=0`）；
   4) 结果：控制器仍未完成初始化，日志持续出现 `Opcode 0x0c03 failed: -110`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：将远程仓库 `note` 克隆到主目录 `obsidian` 中。
+  解答：已完成克隆，目标路径为 `/home/zjh/obsidian/note`，远程为 `https://github.com/junheng-sect/note.git`，当前分支 `main`。
+
+## 修改记录（本轮补充）
+### 系统运维记录
+- 2026-03-15：执行 `git clone https://github.com/junheng-sect/note.git` 到 `/home/zjh/obsidian/`，并验证远程地址与目录内容。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：将 `rasip_pi` 分支中的 `pid_tuning` 功能包部署到 `simple` 分支，并修改相机话题参数后完成构建测试。
+  解答：已完成：从 `origin/rasip_pi` 迁移 `src/pid_tuning` 到当前 `simple` 工作区；将默认相机话题改为 `/camera/image_raw`，并将默认 CSV 路径改为 `zjh_ws`；构建通过且 launch 启动验证通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### pid_tuning
+- 2026-03-15：从 `origin/rasip_pi` 迁移功能包 `src/pid_tuning` 到 `simple` 工作区（包含节点、launch、README、测试与安装文件）。
+- 2026-03-15：更新 `src/pid_tuning/launch/pid_tuning.launch.py`：
+  1) 默认相机话题参数 `ros_image_topic` 由 `/image_raw` 改为 `/camera/image_raw`；
+  2) 默认 CSV 目录由 `~/project/rasip_pi_ws/log/tracking_csv` 改为 `~/project/zjh_ws/log/tracking_csv`；
+  3) 默认汇总 CSV 路径同步改为 `~/project/zjh_ws/log/tracking_csv/pid_tuning_summary.csv`。
+- 2026-03-15：更新 `src/pid_tuning/README.md`，同步说明默认相机话题与默认 CSV 路径。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select pid_tuning`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：按规则执行 launch 验证并停止：
+  `ros2 launch pid_tuning pid_tuning.launch.py world_name:=rover model_name:=x500_mono_cam_down_0 use_usb_cam:=false use_rqt:=false`。
+  启动结果：`pid_tuning_node`、`pid_tuning_csv_logger_node`、`tvec_rvec_node`、`tvec_tf_node` 正常拉起，`tvec_rvec_node` 订阅话题为 `/camera/image_raw`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：新建功能包，实现“先保持 XY 不动，先把 yaw 调正，再使无人机与二维码相对 XY 变为 0”，并使用指定 PID 参数默认值。
+  解答：已完成：新增独立功能包 `yaw_then_xy_tracking`，主节点实现两阶段状态机 `YAW_ALIGN -> XY_ALIGN`；默认 PID 参数与给定值一致，且已完成构建与 launch 验证。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### yaw_then_xy_tracking
+- 2026-03-15：在 `src/` 下使用 `ros2 pkg create` 新建 `ament_python` 功能包 `yaw_then_xy_tracking`（Apache-2.0）。
+- 2026-03-15：新增主节点 `src/yaw_then_xy_tracking/yaw_then_xy_tracking/yaw_then_xy_tracking_node.py`：
+  1) 订阅 `/debug/aruco_pose` 与 `/mavros/state`；
+  2) 发布 `/mavros/setpoint_raw/local`（`FRAME_BODY_NED`）；
+  3) 两阶段逻辑：
+     - `YAW_ALIGN`：锁定 `vx/vy=0`，仅控制 `yaw`（和可选 `z`）；
+     - `XY_ALIGN`：在继续 yaw+z 闭环的同时控制 `xy` 到目标；
+  4) 默认 PID 参数按需求设置：`kp_x/kp_y=0.6, kd_x/kd_y=0.02, kp_yaw=0.60, kd_yaw=0.02, target_z=2.5, kp_z=0.60, kd_z=0.06`，并设置 `vx_limit/vy_limit=1.0`、`velocity_deadband=0.03`、`yaw_rate_deadband=0.03`。
+- 2026-03-15：新增启动文件 `src/yaw_then_xy_tracking/launch/yaw_then_xy_tracking.launch.py`，复用 `tvec.launch.py + tvec_tf_node`，默认图像话题 `/camera/image_raw`。
+- 2026-03-15：更新 `src/yaw_then_xy_tracking/setup.py` 与 `package.xml`，补齐入口点、launch/README 安装项与描述。
+- 2026-03-15：新增 `src/yaw_then_xy_tracking/README.md`，说明两阶段流程、默认参数与启动命令。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select yaw_then_xy_tracking`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：按规则执行启动验证并停止：
+  `ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py world_name:=rover model_name:=x500_mono_cam_down_0 use_usb_cam:=false use_rqt:=false`。
+  启动结果：`yaw_then_xy_tracking_node`、`tvec_rvec_node`、`tvec_tf_node` 正常拉起，节点在非 OFFBOARD 下安全输出零速。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：调整两阶段控制逻辑为“第一步只调正 yaw；第二步再调正 xyz；且第二步中 yaw 仍持续 PID 对正”。
+  解答：已完成：`yaw_then_xy_tracking_node` 第一阶段改为仅 yaw 控制（x/y/z 全锁死）；第二阶段改为 xyz + yaw 同时闭环。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### yaw_then_xy_tracking
+- 2026-03-15：更新 `src/yaw_then_xy_tracking/yaw_then_xy_tracking/yaw_then_xy_tracking_node.py`：
+  1) 第一阶段 `YAW_ALIGN` 改为仅 yaw 控制，强制 `vx=vy=vz=0`，并重置 `pid_z`；
+  2) 第二阶段保持 yaw 闭环，同时控制 `x/y/z` 到目标；
+  3) 更新状态日志文案，明确阶段含义为 `YAW_ALIGN(仅Yaw)` 与 `XY_ALIGN(XYZ+Yaw)`。
+- 2026-03-15：更新 `src/yaw_then_xy_tracking/README.md`，同步说明新流程：先仅 yaw，再 xyz+yaw。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select yaw_then_xy_tracking`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：执行 `ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py world_name:=rover model_name:=x500_mono_cam_down_0 use_usb_cam:=false use_rqt:=false` 冒烟验证通过并停止。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：修改 `land_with_tracking` 的 `ALIGN` 逻辑为“先 yaw，再 xyz（含 z 到 target_z，默认 2.5m）”，后续降落流程保持不变；并将下降过程 tracking 参数改为与指定 `pid_tuning` 参数一致。
+  解答：已完成：`ALIGN` 改为子阶段 `YAW_ONLY -> XYZ_ALIGN`；`YAW_ONLY` 仅控制 yaw，`XYZ_ALIGN` 控制 xyz 并持续 yaw 闭环；`DESCEND_WITH_TRACK` 保持原流程（固定下降速度 + xy/yaw 闭环）不变，且默认 tracking 参数已切换到指定值。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-15：更新 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py`：
+  1) 新增 `track_target_z`（默认 `2.5`）与 `z_align_tolerance_m`（默认 `0.10`）；
+  2) 将 `ALIGN` 拆分为 `ALIGN/YAW_ONLY` 与 `ALIGN/XYZ_ALIGN` 两个子阶段；
+  3) `YAW_ONLY` 子阶段仅输出 `wz`，强制 `vx=vy=vz=0`；
+  4) `XYZ_ALIGN` 子阶段输出 `vx/vy/vz/wz`，要求 `xy/z/yaw` 同时满足阈值并保持 `align_hold_sec`；
+  5) 保持 `DESCEND_WITH_TRACK` 逻辑不变（`vz=-descent_speed_mps` + `xy/yaw` 闭环）；
+  6) tracking 默认 PID 参数切换为：
+     - `kp_x=0.6 ki_x=0.0 kd_x=0.02`
+     - `kp_y=0.6 ki_y=0.0 kd_y=0.02`
+     - `kp_yaw=0.60 ki_yaw=0.0 kd_yaw=0.02`
+     - `track_target_z=2.5 kp_z=0.60 ki_z=0.0 kd_z=0.06`
+     - `vx_limit=1.0 vy_limit=1.0`
+     - `velocity_deadband=0.03 yaw_rate_deadband=0.03`
+- 2026-03-15：更新 `src/land_with_tracking/launch/land_with_tracking.launch.py`，同步默认参数到 launch。
+- 2026-03-15：更新 `src/land_with_tracking/README.md`，说明新 `ALIGN` 两阶段流程和默认参数。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select land_with_tracking`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：按规则执行启动验证并停止：
+  `ros2 launch land_with_tracking land_with_tracking.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`。
+  启动结果：`land_with_tracking_node` 及视觉链路正常拉起，节点在非 OFFBOARD 下安全输出零速。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`xy tracking` 有问题，要求根据日志修正控制量。
+  解答：已根据日志现象修正：在 `ALIGN/XYZ_ALIGN` 中观察到 `ex` 增大时 `vx` 同号输出导致发散，故新增 `x/y` 控制方向参数并默认将 `x` 通道反向；同时新增 `ALIGN` 与 `DESCEND` 阶段的 `xy` 限幅，避免大速度导致丢码和发散。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-15：更新 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py`：
+  1) 新增控制方向参数：`track_vx_sign`（默认 `-1.0`）、`track_vy_sign`（默认 `1.0`）；
+  2) 新增阶段限幅参数：`align_max_vxy`（默认 `0.45`）、`descend_max_vxy`（默认 `0.45`）；
+  3) 在 `compute_tracking_cmd()` 对 `vx/vy` 应用方向修正；
+  4) 在 `ALIGN/XYZ_ALIGN` 和 `DESCEND_WITH_TRACK` 发布前分别应用限幅夹紧。
+- 2026-03-15：更新 `src/land_with_tracking/launch/land_with_tracking.launch.py`，补充以上参数默认值。
+- 2026-03-15：更新 `src/land_with_tracking/README.md`，补充日志修正项与阶段限幅参数说明。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select land_with_tracking`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：按规则执行启动验证并停止：
+  `ros2 launch land_with_tracking land_with_tracking.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：新建 `land_with_tracking_v2` 功能包，流程为 `ALIGN(YAW_ONLY->XYZ_ALIGN) -> HOVER_BEFORE_LAND -> DESCEND_WITH_TRACK -> TOUCHDOWN_DISARM -> DONE`，并采用指定 PID 参数。
+  解答：已完成：新增独立包 `land_with_tracking_v2`，实现所需状态机与参数默认值；前两步对齐逻辑参考 `yaw_then_xy_tracking`，落地下压+周期 disarm 参考 landing/land_with_tracking 机制。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-15：在 `src/` 下使用 `ros2 pkg create` 新建 `ament_python` 包 `land_with_tracking_v2`（Apache-2.0）。
+- 2026-03-15：新增主节点 `src/land_with_tracking_v2/land_with_tracking_v2/land_with_tracking_v2_node.py`：
+  1) `ALIGN/YAW_ONLY`：仅调整 yaw，`x/y/z` 不动；
+  2) `ALIGN/XYZ_ALIGN`：调整 `x/y/z` 到目标（默认 `target_z=2.5`）并持续 yaw 闭环；
+  3) `HOVER_BEFORE_LAND`：悬停 1 秒；
+  4) `DESCEND_WITH_TRACK`：固定下降速度 + `xy+yaw` 闭环；
+  5) `TOUCHDOWN_DISARM`：最低油门下压并每秒请求 disarm；
+  6) `DONE`：完成后零速保持。
+- 2026-03-15：默认 PID 参数按要求写入：
+  `kp_x=0.6 ki_x=0.0 kd_x=0.02`、
+  `kp_y=0.6 ki_y=0.0 kd_y=0.02`、
+  `kp_yaw=0.60 ki_yaw=0.0 kd_yaw=0.02`、
+  `kp_z=0.60 ki_z=0.0 kd_z=0.06`、
+  `track_target_z=2.5`、
+  `vx_limit=1.0 vy_limit=1.0`、
+  `velocity_deadband=0.03 yaw_rate_deadband=0.03`。
+- 2026-03-15：新增启动文件 `src/land_with_tracking_v2/launch/land_with_tracking_v2.launch.py`，默认包含 `tvec_tf.launch.py`。
+- 2026-03-15：新增文档 `src/land_with_tracking_v2/README.md`，说明流程、参数与运行方式。
+- 2026-03-15：更新 `src/land_with_tracking_v2/setup.py`、`package.xml`，补齐入口点、launch/README 安装项与描述。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select land_with_tracking_v2`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：按规则执行启动验证并停止：
+  `ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`。
+  启动结果：`land_with_tracking_v2_node` 与视觉链路节点正常拉起。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`land_with_tracking_v2` 在 `ALIGN/XYZ_ALIGN` 阶段跟踪失败，分析原因。
+  解答：根据日志，主因是 XY 控制通道出现“误差同号加速”导致正反馈发散（`|ex|`/`|ey|` 持续增大且 `vx`/`vy` 与误差方向长期同向）；次因是 z 误差偶发突变触发较大 `vz`（如 `ez=-0.32 -> vz=-0.60`），叠加造成视野内目标快速漂移并最终超时丢码。yaw 通道误差始终较小（约 0~2 度），不是主要问题。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-15：按“每轮对话都记录”规则，新增一次 `land_with_tracking_v2` 跟踪失败日志分析记录（本轮未修改代码）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：先固定 `xy` 变换为机体系直控（对齐 `yaw_then_xy_tracking` 思路，去掉动态旋转环节）。
+  解答：已完成：`land_with_tracking_v2` 的 `compute_track_cmd()` 改为机体误差直控 `ex=target_x-pose.x`、`ey=pose.y-target_y`，不再执行动态 yaw 旋转与 base_pose 参与的坐标变换。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-15：更新 `src/land_with_tracking_v2/land_with_tracking_v2/land_with_tracking_v2_node.py`：
+  1) `xy` 误差计算改为机体误差直控；
+  2) 删除 `control_loop` 中“base_pose 超时等待”分支（不再依赖动态旋转结果）；
+  3) 保持其余状态机与降落流程不变。
+- 2026-03-15：更新 `src/land_with_tracking_v2/README.md`，补充“XY 机体系直控、不使用动态 yaw 旋转链路”说明。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select land_with_tracking_v2`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：按规则执行启动验证并停止：
+  `ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py world_name:=rover model_name:=x500_mono_cam_down_0`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`land_with_tracking_v2` 机体系左右与前后控制量对调，且仍出现发散。
+  解答：已继续修正控制量映射：在 `xy` 输出“通道交换”基础上，增加“双通道反向”处理（先交换，再同时取反），用于消除日志中 `ex/ey` 与 `vx/vy` 同号正反馈问题。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-15：更新 `src/land_with_tracking_v2/land_with_tracking_v2/land_with_tracking_v2_node.py` 中 `compute_track_cmd()`：
+  1) 保持 `x/y` 通道交换；
+  2) 对交换后的 `vx/vy` 同时取反，修正同号发散问题。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select land_with_tracking_v2`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：执行 `ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py world_name:=rover model_name:=x500_mono_cam_down_0` 冒烟验证通过并停止。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`land_with_tracking_v2` 现在 xy 对应关系正确，但控制量方向反了，x/y 都发散。
+  解答：已修正为“仅做 x-y 通道交换，不做符号反向”；撤销上一轮双通道取反逻辑。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-15：更新 `src/land_with_tracking_v2/land_with_tracking_v2/land_with_tracking_v2_node.py`：
+  1) `compute_track_cmd()` 中保留 `x/y` 通道交换；
+  2) 删除对交换后 `vx/vy` 的负号反向。
+
+#### 构建与验证
+- 2026-03-15：按规则执行 `colcon build --symlink-install --packages-select land_with_tracking_v2`，构建通过。
+- 2026-03-15：按规则执行 `source install/setup.bash`。
+- 2026-03-15：执行 `ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py world_name:=rover model_name:=x500_mono_cam_down_0` 冒烟验证通过并停止。

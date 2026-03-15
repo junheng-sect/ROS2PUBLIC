@@ -14,7 +14,7 @@ from std_msgs.msg import Float64
 
 
 class PIDController:
-    """简单 PID 控制器（带积分限幅和输出限幅）。"""
+    """简单 PID 控制器（积分限幅 + 输出限幅）。"""
 
     def __init__(self, kp=0.5, ki=0.0, kd=0.05, out_limit=1.0, i_limit=2.0):
         self.kp = float(kp)
@@ -38,15 +38,10 @@ class PIDController:
         if dt <= 1e-6:
             dt = 1e-2
 
-        # P 项：当前误差的比例输出。
         p_term = self.kp * error
-
-        # I 项：误差积分并限幅，防止积分饱和。
         self.integral += error * dt
         self.integral = max(-self.i_limit, min(self.i_limit, self.integral))
         i_term = self.ki * self.integral
-
-        # D 项：用误差变化率抑制振荡。
         d_term = self.kd * (error - self.prev_error) / dt
 
         out = p_term + i_term + d_term
@@ -57,19 +52,20 @@ class PIDController:
         return out
 
 
-class LandWithTrackingNode(Node):
-    """先对齐 ArUco，再带 XY+Yaw 闭环下降，最后下压并 disarm。"""
+class LandWithTrackingV2Node(Node):
+    """land_with_tracking_v2 主节点：先对齐，再下降，再下压 disarm。"""
 
     PHASE_ALIGN = 'ALIGN'
     PHASE_HOVER_BEFORE_LAND = 'HOVER_BEFORE_LAND'
     PHASE_DESCEND_WITH_TRACK = 'DESCEND_WITH_TRACK'
     PHASE_TOUCHDOWN_DISARM = 'TOUCHDOWN_DISARM'
     PHASE_DONE = 'DONE'
+
     ALIGN_SUBPHASE_YAW_ONLY = 'YAW_ONLY'
-    ALIGN_SUBPHASE_XYZ = 'XYZ_ALIGN'
+    ALIGN_SUBPHASE_XYZ_ALIGN = 'XYZ_ALIGN'
 
     def __init__(self):
-        super().__init__('land_with_tracking_node')
+        super().__init__('land_with_tracking_v2_node')
 
         # ===== 话题与服务 =====
         self.declare_parameter('state_topic', '/mavros/state')
@@ -81,32 +77,40 @@ class LandWithTrackingNode(Node):
         self.declare_parameter('cmd_vel_topic', '/mavros/setpoint_velocity/cmd_vel')
         self.declare_parameter('arming_service', '/mavros/cmd/arming')
 
-        # ===== 任务目标与阈值 =====
+        # ===== 任务目标 =====
         self.declare_parameter('track_target_x', 0.0)
         self.declare_parameter('track_target_y', 0.0)
         self.declare_parameter('track_target_yaw', 0.0)
         self.declare_parameter('track_target_z', 2.5)
+
+        # ===== 对齐阈值 =====
         self.declare_parameter('xy_align_tolerance_m', 0.10)
         self.declare_parameter('z_align_tolerance_m', 0.10)
         self.declare_parameter('yaw_align_tolerance_deg', 5.0)
         self.declare_parameter('align_hold_sec', 1.0)
         self.declare_parameter('hover_after_align_sec', 1.0)
 
-        # ===== PID 参数 =====
+        # ===== PID 参数（按需求默认值） =====
         self.declare_parameter('kp_x', 0.6)
         self.declare_parameter('ki_x', 0.0)
         self.declare_parameter('kd_x', 0.02)
         self.declare_parameter('kp_y', 0.6)
         self.declare_parameter('ki_y', 0.0)
         self.declare_parameter('kd_y', 0.02)
-
         self.declare_parameter('kp_yaw', 0.60)
         self.declare_parameter('ki_yaw', 0.0)
         self.declare_parameter('kd_yaw', 0.02)
-
         self.declare_parameter('kp_z', 0.60)
         self.declare_parameter('ki_z', 0.0)
         self.declare_parameter('kd_z', 0.06)
+
+        # ===== 速度限制与死区 =====
+        self.declare_parameter('vx_limit', 1.0)
+        self.declare_parameter('vy_limit', 1.0)
+        self.declare_parameter('max_vz', 0.8)
+        self.declare_parameter('max_wz', 1.0)
+        self.declare_parameter('velocity_deadband', 0.03)
+        self.declare_parameter('yaw_rate_deadband', 0.03)
 
         # ===== 下降与落地参数 =====
         self.declare_parameter('descent_speed_mps', 0.5)
@@ -116,26 +120,16 @@ class LandWithTrackingNode(Node):
         self.declare_parameter('heuristic_disarm_hold_sec', 3.0)
         self.declare_parameter('min_throttle_descent_speed_mps', 0.35)
         self.declare_parameter('min_throttle_disarm_duration_sec', 5.0)
+        self.declare_parameter('disarm_retry_interval_sec', 1.0)
 
         # ===== 通用安全参数 =====
         self.declare_parameter('control_rate_hz', 20.0)
         self.declare_parameter('pose_timeout_sec', 0.5)
         self.declare_parameter('base_pose_timeout_sec', 0.5)
-        self.declare_parameter('vx_limit', 1.0)
-        self.declare_parameter('vy_limit', 1.0)
-        self.declare_parameter('track_vx_sign', -1.0)
-        self.declare_parameter('track_vy_sign', 1.0)
-        self.declare_parameter('align_max_vxy', 0.45)
-        self.declare_parameter('descend_max_vxy', 0.45)
-        self.declare_parameter('max_vz', 0.8)
-        self.declare_parameter('max_wz', 1.0)
-        self.declare_parameter('velocity_deadband', 0.03)
-        self.declare_parameter('yaw_rate_deadband', 0.03)
         self.declare_parameter('require_offboard', True)
         self.declare_parameter('start_on_offboard_entry', True)
         self.declare_parameter('use_dynamic_marker_yaw', True)
         self.declare_parameter('fallback_marker_in_map_yaw_deg', 90.0)
-        self.declare_parameter('disarm_retry_interval_sec', 1.0)
 
         self.state_topic = self.get_parameter('state_topic').value
         self.extended_state_topic = self.get_parameter('extended_state_topic').value
@@ -150,6 +144,7 @@ class LandWithTrackingNode(Node):
         self.track_target_y = float(self.get_parameter('track_target_y').value)
         self.track_target_yaw = float(self.get_parameter('track_target_yaw').value)
         self.track_target_z = float(self.get_parameter('track_target_z').value)
+
         self.xy_align_tolerance_m = float(self.get_parameter('xy_align_tolerance_m').value)
         self.z_align_tolerance_m = float(self.get_parameter('z_align_tolerance_m').value)
         self.yaw_align_tolerance_deg = float(self.get_parameter('yaw_align_tolerance_deg').value)
@@ -162,13 +157,19 @@ class LandWithTrackingNode(Node):
         kp_y = float(self.get_parameter('kp_y').value)
         ki_y = float(self.get_parameter('ki_y').value)
         kd_y = float(self.get_parameter('kd_y').value)
-
         kp_yaw = float(self.get_parameter('kp_yaw').value)
         ki_yaw = float(self.get_parameter('ki_yaw').value)
         kd_yaw = float(self.get_parameter('kd_yaw').value)
         kp_z = float(self.get_parameter('kp_z').value)
         ki_z = float(self.get_parameter('ki_z').value)
         kd_z = float(self.get_parameter('kd_z').value)
+
+        self.vx_limit = float(self.get_parameter('vx_limit').value)
+        self.vy_limit = float(self.get_parameter('vy_limit').value)
+        self.max_vz = float(self.get_parameter('max_vz').value)
+        self.max_wz = float(self.get_parameter('max_wz').value)
+        self.velocity_deadband = float(self.get_parameter('velocity_deadband').value)
+        self.yaw_rate_deadband = float(self.get_parameter('yaw_rate_deadband').value)
 
         self.descent_speed_mps = abs(float(self.get_parameter('descent_speed_mps').value))
         self.land_rel_alt_threshold_m = float(self.get_parameter('land_rel_alt_threshold_m').value)
@@ -177,29 +178,19 @@ class LandWithTrackingNode(Node):
         self.heuristic_disarm_hold_sec = float(self.get_parameter('heuristic_disarm_hold_sec').value)
         self.min_throttle_descent_speed_mps = abs(float(self.get_parameter('min_throttle_descent_speed_mps').value))
         self.min_throttle_disarm_duration_sec = float(self.get_parameter('min_throttle_disarm_duration_sec').value)
+        self.disarm_retry_interval_sec = float(self.get_parameter('disarm_retry_interval_sec').value)
 
         self.control_rate_hz = float(self.get_parameter('control_rate_hz').value)
         self.pose_timeout_sec = float(self.get_parameter('pose_timeout_sec').value)
         self.base_pose_timeout_sec = float(self.get_parameter('base_pose_timeout_sec').value)
-        self.vx_limit = float(self.get_parameter('vx_limit').value)
-        self.vy_limit = float(self.get_parameter('vy_limit').value)
-        self.track_vx_sign = float(self.get_parameter('track_vx_sign').value)
-        self.track_vy_sign = float(self.get_parameter('track_vy_sign').value)
-        self.align_max_vxy = abs(float(self.get_parameter('align_max_vxy').value))
-        self.descend_max_vxy = abs(float(self.get_parameter('descend_max_vxy').value))
-        self.max_vz = float(self.get_parameter('max_vz').value)
-        self.max_wz = float(self.get_parameter('max_wz').value)
-        self.velocity_deadband = float(self.get_parameter('velocity_deadband').value)
-        self.yaw_rate_deadband = float(self.get_parameter('yaw_rate_deadband').value)
         self.require_offboard = bool(self.get_parameter('require_offboard').value)
         self.start_on_offboard_entry = bool(self.get_parameter('start_on_offboard_entry').value)
         self.use_dynamic_marker_yaw = bool(self.get_parameter('use_dynamic_marker_yaw').value)
         self.fallback_marker_in_map_yaw_deg = float(self.get_parameter('fallback_marker_in_map_yaw_deg').value)
-        self.disarm_retry_interval_sec = float(self.get_parameter('disarm_retry_interval_sec').value)
 
-        # ===== PID 初始化 =====
-        self.pid_track_x = PIDController(kp_x, ki_x, kd_x, out_limit=self.vx_limit)
-        self.pid_track_y = PIDController(kp_y, ki_y, kd_y, out_limit=self.vy_limit)
+        # ===== PID =====
+        self.pid_x = PIDController(kp_x, ki_x, kd_x, out_limit=self.vx_limit)
+        self.pid_y = PIDController(kp_y, ki_y, kd_y, out_limit=self.vy_limit)
         self.pid_yaw = PIDController(kp_yaw, ki_yaw, kd_yaw, out_limit=self.max_wz)
         self.pid_z = PIDController(kp_z, ki_z, kd_z, out_limit=self.max_vz)
 
@@ -211,7 +202,6 @@ class LandWithTrackingNode(Node):
 
         self.rel_alt_m = float('nan')
         self.has_rel_alt = False
-
         self.vx_local = 0.0
         self.vy_local = 0.0
         self.vz_local = 0.0
@@ -220,7 +210,6 @@ class LandWithTrackingNode(Node):
         self.aruco_pose = ArucoBasePose()
         self.has_aruco_pose = False
         self.last_aruco_time = None
-
         self.base_yaw = 0.0
         self.has_base_pose = False
         self.last_base_pose_time = None
@@ -238,7 +227,7 @@ class LandWithTrackingNode(Node):
 
         self.latest_status = '等待任务启动'
 
-        # ===== QoS（匹配 MAVROS） =====
+        # ===== QoS =====
         mavros_best_effort_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
@@ -249,29 +238,17 @@ class LandWithTrackingNode(Node):
         # ===== 通信 =====
         self.state_sub = self.create_subscription(State, self.state_topic, self.state_callback, 10)
         self.ext_state_sub = self.create_subscription(
-            ExtendedState,
-            self.extended_state_topic,
-            self.extended_state_callback,
-            mavros_best_effort_qos,
+            ExtendedState, self.extended_state_topic, self.extended_state_callback, mavros_best_effort_qos
         )
         self.rel_alt_sub = self.create_subscription(
-            Float64,
-            self.rel_alt_topic,
-            self.rel_alt_callback,
-            mavros_best_effort_qos,
+            Float64, self.rel_alt_topic, self.rel_alt_callback, mavros_best_effort_qos
         )
         self.vel_sub = self.create_subscription(
-            TwistStamped,
-            self.vel_local_topic,
-            self.velocity_callback,
-            mavros_best_effort_qos,
+            TwistStamped, self.vel_local_topic, self.velocity_callback, mavros_best_effort_qos
         )
         self.aruco_sub = self.create_subscription(ArucoBasePose, self.aruco_pose_topic, self.aruco_callback, 10)
         self.base_pose_sub = self.create_subscription(
-            PoseStamped,
-            self.base_pose_topic,
-            self.base_pose_callback,
-            mavros_best_effort_qos,
+            PoseStamped, self.base_pose_topic, self.base_pose_callback, mavros_best_effort_qos
         )
 
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_vel_topic, 10)
@@ -281,9 +258,7 @@ class LandWithTrackingNode(Node):
         self.log_timer = self.create_timer(1.0, self.log_callback)
 
         self.get_logger().info(
-            'land_with_tracking_node 已启动 | '
-            f'state={self.state_topic} | ext={self.extended_state_topic} | '
-            f'rel_alt={self.rel_alt_topic} | vel={self.vel_local_topic} | '
+            'land_with_tracking_v2_node 已启动 | '
             f'aruco={self.aruco_pose_topic} | base_pose={self.base_pose_topic} | '
             f'cmd={self.cmd_vel_topic} | arming_srv={self.arming_service}'
         )
@@ -304,7 +279,8 @@ class LandWithTrackingNode(Node):
         cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
         return math.atan2(siny_cosp, cosy_cosp)
 
-    def apply_deadband(self, value: float, deadband: float) -> float:
+    @staticmethod
+    def apply_deadband(value: float, deadband: float) -> float:
         return 0.0 if abs(value) < deadband else value
 
     def state_callback(self, msg: State):
@@ -313,8 +289,8 @@ class LandWithTrackingNode(Node):
         self.prev_offboard = is_offboard
         self.current_state = msg
 
-        # OFFBOARD 上升沿重置任务状态，重新执行全流程。
         if self.start_on_offboard_entry and offboard_rising:
+            # OFFBOARD 上升沿启动完整任务流程。
             self.phase = self.PHASE_ALIGN
             self.align_subphase = self.ALIGN_SUBPHASE_YAW_ONLY
             self.mission_started = True
@@ -324,11 +300,11 @@ class LandWithTrackingNode(Node):
             self.min_throttle_start_time = None
             self.last_disarm_request_time = None
             self.disarm_in_flight = False
-            self.pid_track_x.reset()
-            self.pid_track_y.reset()
+            self.pid_x.reset()
+            self.pid_y.reset()
             self.pid_yaw.reset()
             self.pid_z.reset()
-            self.get_logger().info('检测到 OFFBOARD 上升沿，开始执行 land_with_tracking 任务')
+            self.get_logger().info('检测到 OFFBOARD 上升沿，开始执行 land_with_tracking_v2 任务')
 
     def extended_state_callback(self, msg: ExtendedState):
         self.extended_state = msg
@@ -393,6 +369,15 @@ class LandWithTrackingNode(Node):
         self.heuristic_landed_start_time = None
         return False
 
+    def publish_cmd(self, vx: float, vy: float, vz: float, wz: float):
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.linear.x = float(vx)
+        msg.twist.linear.y = float(vy)
+        msg.twist.linear.z = float(vz)
+        msg.twist.angular.z = float(wz)
+        self.cmd_pub.publish(msg)
+
     def try_send_disarm(self):
         now_sec = self.get_clock().now().nanoseconds / 1e9
         if self.disarm_in_flight:
@@ -424,65 +409,54 @@ class LandWithTrackingNode(Node):
 
         future.add_done_callback(_done_cb)
 
-    def publish_cmd(self, vx: float, vy: float, vz: float, wz: float):
-        msg = TwistStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.twist.linear.x = float(vx)
-        msg.twist.linear.y = float(vy)
-        msg.twist.linear.z = float(vz)
-        msg.twist.angular.z = float(wz)
-        self.cmd_pub.publish(msg)
+    def compute_track_cmd(self):
+        """
+        计算 xy/yaw/z 误差与控制量。
 
-    @staticmethod
-    def clamp(value: float, limit: float) -> float:
-        if limit <= 0.0:
-            return 0.0
-        return max(-limit, min(limit, value))
-
-    def compute_tracking_cmd(self):
-        """计算 XY+Yaw 闭环控制量（z 单独在流程里处理）。"""
+        说明：
+        - 按机体误差语义直接闭环（对齐 yaw_then_xy_tracking 思路）：
+          ex = target_x - pose.x，ey = pose.y - target_y；
+        - 去掉动态 yaw 旋转链路，不再依赖 base_pose。
+        - yaw/z 误差分别独立 PID。
+        """
         ex_m = self.track_target_x - float(self.aruco_pose.x)
-        ey_m = self.track_target_y - float(self.aruco_pose.y)
-        eyaw = self.wrap_to_pi(self.track_target_yaw - float(self.aruco_pose.yaw))
+        ey_m = float(self.aruco_pose.y) - self.track_target_y
         ez = self.track_target_z - float(self.aruco_pose.z)
+        eyaw = self.wrap_to_pi(self.track_target_yaw - float(self.aruco_pose.yaw))
 
-        if self.use_dynamic_marker_yaw:
-            if not self.is_base_pose_fresh():
-                return None
-            yaw_map_marker = self.wrap_to_pi(self.base_yaw - float(self.aruco_pose.yaw))
-        else:
-            yaw_map_marker = math.radians(self.fallback_marker_in_map_yaw_deg)
+        # 直接机体误差闭环，不做动态 yaw 旋转。
+        ex_cmd, ey_cmd = ex_m, ey_m
 
-        ex_cmd, ey_cmd = self.rotate_xy(ex_m, ey_m, yaw_map_marker)
-
-        vx = self.apply_deadband(self.pid_track_x.update(ex_cmd), self.velocity_deadband)
-        vy = self.apply_deadband(self.pid_track_y.update(ey_cmd), self.velocity_deadband)
-        # 基于实测日志修正：x 通道同号会导致误差发散，默认反向 x 控制；y 保持原方向。
-        vx *= self.track_vx_sign
-        vy *= self.track_vy_sign
-        wz = self.apply_deadband(self.pid_yaw.update(eyaw), self.yaw_rate_deadband)
+        # 实机验证结论：
+        # 前后/左右通道在输出端存在互换，因此这里做 x-y 交换。
+        # 当前版本不做额外符号反向，避免两轴同向发散。
+        vx_raw = self.pid_x.update(ex_cmd)
+        vy_raw = self.pid_y.update(ey_cmd)
+        vx = self.apply_deadband(vy_raw, self.velocity_deadband)
+        vy = self.apply_deadband(vx_raw, self.velocity_deadband)
         vz = self.apply_deadband(self.pid_z.update(ez), self.velocity_deadband)
+        wz = self.apply_deadband(self.pid_yaw.update(eyaw), self.yaw_rate_deadband)
         return vx, vy, vz, wz, ex_m, ey_m, ez, eyaw
 
     def control_loop(self):
-        # 非 OFFBOARD 时输出零速。
         if self.require_offboard and self.current_state.mode != 'OFFBOARD':
             self.publish_cmd(0.0, 0.0, 0.0, 0.0)
-            self.pid_track_x.reset()
-            self.pid_track_y.reset()
-            self.pid_yaw.reset()
+            self.pid_x.reset()
+            self.pid_y.reset()
             self.pid_z.reset()
+            self.pid_yaw.reset()
             self.latest_status = f'模式={self.current_state.mode}，未进入 OFFBOARD，输出零速'
             return
 
-        # 未启动时保持零速。
         if self.start_on_offboard_entry and not self.mission_started:
             self.publish_cmd(0.0, 0.0, 0.0, 0.0)
             self.latest_status = '已进入 OFFBOARD，等待任务启动'
             return
 
-        # 已经 disarm，任务完成。
-        if not self.current_state.armed and self.phase in (self.PHASE_DESCEND_WITH_TRACK, self.PHASE_TOUCHDOWN_DISARM):
+        if not self.current_state.armed and self.phase in (
+            self.PHASE_DESCEND_WITH_TRACK,
+            self.PHASE_TOUCHDOWN_DISARM,
+        ):
             self.phase = self.PHASE_DONE
 
         if self.phase == self.PHASE_DONE:
@@ -490,30 +464,21 @@ class LandWithTrackingNode(Node):
             self.latest_status = '阶段=DONE | 已 disarm，任务完成'
             return
 
-        # ALIGN / DESCEND 阶段都要求视觉新鲜。
         if self.phase in (self.PHASE_ALIGN, self.PHASE_DESCEND_WITH_TRACK):
             if not self.is_aruco_fresh():
                 self.publish_cmd(0.0, 0.0, 0.0, 0.0)
+                self.align_hold_start_time = None
                 self.latest_status = f'阶段={self.phase} | ArUco 数据超时，输出零速等待'
-                self.align_hold_start_time = None
                 return
 
-            track_cmd = self.compute_tracking_cmd()
-            if track_cmd is None:
-                self.publish_cmd(0.0, 0.0, 0.0, 0.0)
-                self.latest_status = f'阶段={self.phase} | base_pose 超时，输出零速等待'
-                self.align_hold_start_time = None
-                return
+            track_cmd = self.compute_track_cmd()
+            vx, vy, vz, wz, ex_m, ey_m, ez, eyaw = track_cmd
+            yaw_tol = math.radians(self.yaw_align_tolerance_deg)
+            now_sec = self.get_clock().now().nanoseconds / 1e9
 
-            vx, vy, vz_align, wz, ex_m, ey_m, ez, eyaw = track_cmd
-
-            # 阶段1：先 yaw-only，再 xyz 对齐（且保持 yaw 闭环）。
             if self.phase == self.PHASE_ALIGN:
-                yaw_tol = math.radians(self.yaw_align_tolerance_deg)
-                now_sec = self.get_clock().now().nanoseconds / 1e9
-
+                # 子阶段1：仅 yaw 控制，x/y/z 不动。
                 if self.align_subphase == self.ALIGN_SUBPHASE_YAW_ONLY:
-                    # 子阶段1：仅调整 yaw，x/y/z 全锁死。
                     self.publish_cmd(0.0, 0.0, 0.0, wz)
                     yaw_ok = (abs(eyaw) <= yaw_tol)
                     if yaw_ok:
@@ -521,10 +486,10 @@ class LandWithTrackingNode(Node):
                             self.align_hold_start_time = now_sec
                         hold_dt = now_sec - self.align_hold_start_time
                         if hold_dt >= self.align_hold_sec:
-                            self.align_subphase = self.ALIGN_SUBPHASE_XYZ
+                            self.align_subphase = self.ALIGN_SUBPHASE_XYZ_ALIGN
                             self.align_hold_start_time = None
-                            self.pid_track_x.reset()
-                            self.pid_track_y.reset()
+                            self.pid_x.reset()
+                            self.pid_y.reset()
                             self.pid_z.reset()
                             self.get_logger().info('ALIGN 子阶段切换：YAW_ONLY -> XYZ_ALIGN')
                     else:
@@ -536,10 +501,8 @@ class LandWithTrackingNode(Node):
                     )
                     return
 
-                # 子阶段2：调整 xyz，并持续 yaw 闭环。
-                vx = self.clamp(vx, self.align_max_vxy)
-                vy = self.clamp(vy, self.align_max_vxy)
-                self.publish_cmd(vx, vy, vz_align, wz)
+                # 子阶段2：调整 xyz，并保持 yaw 闭环。
+                self.publish_cmd(vx, vy, vz, wz)
                 xy_err = math.hypot(ex_m, ey_m)
                 aligned = (
                     xy_err <= self.xy_align_tolerance_m
@@ -559,30 +522,26 @@ class LandWithTrackingNode(Node):
 
                 self.latest_status = (
                     f'阶段=ALIGN/XYZ_ALIGN | ex={ex_m:.2f}, ey={ey_m:.2f}, ez={ez:.2f}, '
-                    f'eyaw={math.degrees(eyaw):.1f}deg | vx={vx:.2f}, vy={vy:.2f}, vz={vz_align:.2f}, wz={wz:.2f}'
+                    f'eyaw={math.degrees(eyaw):.1f}deg | vx={vx:.2f}, vy={vy:.2f}, vz={vz:.2f}, wz={wz:.2f}'
                 )
                 return
 
-            # 阶段3：边下降边做 XY+Yaw 闭环。
-            vx = self.clamp(vx, self.descend_max_vxy)
-            vy = self.clamp(vy, self.descend_max_vxy)
+            # 下降阶段：保持 xy+yaw 跟踪，垂向恒速下降。
             self.publish_cmd(vx, vy, -self.descent_speed_mps, wz)
             self.latest_status = (
                 f'阶段=DESCEND_WITH_TRACK | vz=-{self.descent_speed_mps:.2f}, '
                 f'ex={ex_m:.2f}, ey={ey_m:.2f}, eyaw={math.degrees(eyaw):.1f}deg'
             )
 
-            # 若飞控已明确 ON_GROUND，直接切到下压+解锁阶段。
             if self.is_landed_by_extended_state() or self.is_heuristic_landed_confirmed():
                 self.phase = self.PHASE_TOUCHDOWN_DISARM
-                self.min_throttle_start_time = self.get_clock().now().nanoseconds / 1e9
+                self.min_throttle_start_time = now_sec
                 self.get_logger().info('检测到接地条件，切换 TOUCHDOWN_DISARM')
             return
 
-        # 阶段2：对齐后悬停 1s。
         if self.phase == self.PHASE_HOVER_BEFORE_LAND:
-            now_sec = self.get_clock().now().nanoseconds / 1e9
             self.publish_cmd(0.0, 0.0, 0.0, 0.0)
+            now_sec = self.get_clock().now().nanoseconds / 1e9
             hold_dt = 0.0 if self.hover_start_time is None else (now_sec - self.hover_start_time)
             self.latest_status = (
                 f'阶段=HOVER_BEFORE_LAND | 悬停 {hold_dt:.2f}/{self.hover_after_align_sec:.2f}s'
@@ -592,7 +551,7 @@ class LandWithTrackingNode(Node):
                 self.get_logger().info('悬停完成，切换 DESCEND_WITH_TRACK')
             return
 
-        # 阶段4：落地末段，下压+每秒申请 disarm。
+        # TOUCHDOWN_DISARM：最低油门下压，并周期 disarm。
         now_sec = self.get_clock().now().nanoseconds / 1e9
         if self.min_throttle_start_time is None:
             self.min_throttle_start_time = now_sec
@@ -600,7 +559,6 @@ class LandWithTrackingNode(Node):
 
         self.publish_cmd(0.0, 0.0, -self.min_throttle_descent_speed_mps, 0.0)
         self.try_send_disarm()
-
         self.latest_status = (
             f'阶段=TOUCHDOWN_DISARM | vz=-{self.min_throttle_descent_speed_mps:.2f}, '
             f'hold={hold_dt:.2f}/{self.min_throttle_disarm_duration_sec:.2f}s, 每秒disarm'
@@ -612,7 +570,7 @@ class LandWithTrackingNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LandWithTrackingNode()
+    node = LandWithTrackingV2Node()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

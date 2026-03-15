@@ -13,7 +13,7 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
 
-    # 默认包含视觉链路，保证一键启动可直接执行任务。
+    # 默认包含视觉链路，保证一键启动即可执行流程。
     tvec_tf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([FindPackageShare('tvec_tf'), '/launch/tvec_tf.launch.py']),
         launch_arguments={
@@ -24,17 +24,17 @@ def generate_launch_description():
     )
 
     node = Node(
-        package='land_with_tracking',
-        executable='land_with_tracking_node',
-        name='land_with_tracking_node',
+        package='land_with_tracking_v2',
+        executable='land_with_tracking_v2_node',
+        name='land_with_tracking_v2_node',
         output='screen',
         parameters=[{
+            'track_target_z': 2.5,
             'xy_align_tolerance_m': 0.10,
             'z_align_tolerance_m': 0.10,
             'yaw_align_tolerance_deg': 5.0,
             'align_hold_sec': 1.0,
             'hover_after_align_sec': 1.0,
-            'track_target_z': 2.5,
             'kp_x': 0.6,
             'ki_x': 0.0,
             'kd_x': 0.02,
@@ -49,10 +49,6 @@ def generate_launch_description():
             'kd_z': 0.06,
             'vx_limit': 1.0,
             'vy_limit': 1.0,
-            'track_vx_sign': -1.0,
-            'track_vy_sign': 1.0,
-            'align_max_vxy': 0.45,
-            'descend_max_vxy': 0.45,
             'velocity_deadband': 0.03,
             'yaw_rate_deadband': 0.03,
             'descent_speed_mps': 0.5,

@@ -873,3 +873,511 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### 工作空间与协作规范
 - 2026-03-13：根据用户提供的示例段落，调整本周进展总结的表述风格，并补充本轮问答记录。
+
+## 从 AGENTS 迁移的记录（2026-03-14）
+- 说明：以下内容由 AGENTS.md 迁移而来，后续请继续维护 LOG.md 与 PI_LOG.md。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将 `simple` 分支中的 `body_frame_tracking_minimal`、`body_frame_tracking`、`aruco_tracking_minimal`、`land_with_tracking` 同步到笔记本和树莓派，并构建测试至无报错。
+  解答：已完成。两端均已从 `origin/simple` 同步 4 个功能包并通过构建与启动自检。
+
+## 修改记录（本轮补充）
+- 2026-03-13：笔记本 `rasip_pi_ws` 已同步 4 个功能包并完成 `colcon build --packages-select body_frame_tracking_minimal body_frame_tracking aruco_tracking_minimal land_with_tracking`。
+- 2026-03-13：树莓派 `rasip_pi_ws`（`10.250.57.110`）已同步 4 个功能包并完成同样构建。
+- 2026-03-13：两端已分别执行 4 个 launch 的限时启动自检，日志无 `ERROR/Traceback/process has died`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：参考本地 aruco_tracking 的 USB 相机链路，把 `body_frame_tracking_minimal`、`body_frame_tracking`、`aruco_tracking_minimal`、`land_with_tracking` 的图像来源从 GZ bridge 切到 USB 相机。
+  解答：已完成。4 个包均改为复用 `tvec_tf -> tvec` 的 USB 相机链路，不再在这 4 个包内启动 `ros_gz_bridge/parameter_bridge`。
+
+## 修改记录（本轮补充）
+- 2026-03-13：`aruco_tracking_minimal.launch.py` 移除 `gz_bridge + 本地tvec`，改为 `IncludeLaunchDescription(tvec_tf.launch.py)`；新增 `use_rqt` 参数；默认 `ros_image_topic` 改为 `/image_raw`。
+- 2026-03-13：`body_frame_tracking_minimal.launch.py` 做同样改造（移除 gz bridge，改为复用 `tvec_tf` USB 链路）。
+- 2026-03-13：`body_frame_tracking.launch.py`、`land_with_tracking.launch.py` 增加 `use_rqt` 透传，并统一默认 `ros_image_topic=/image_raw`。
+- 2026-03-13：完成构建与启动验证：`colcon build --packages-select aruco_tracking_minimal body_frame_tracking_minimal body_frame_tracking land_with_tracking tvec tvec_tf` 通过；4 个 launch 限时启动均无报错。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：两个 minimal 功能包中禁用 `map_aruco_static_tf_node`，并将 rqt 启动参数默认改为 false。
+  解答：已完成。两个 minimal launch 不再包含会拉起静态 TF 的 `tvec_tf.launch.py`，改为 `tvec.launch.py + tvec_tf_node`；`use_rqt` 默认值已设为 `false`。
+
+## 修改记录（本轮补充）
+- 2026-03-13：`aruco_tracking_minimal.launch.py` 移除静态 TF 链路依赖，默认 `use_rqt=false`。
+- 2026-03-13：`body_frame_tracking_minimal.launch.py` 移除静态 TF 链路依赖，默认 `use_rqt=false`。
+- 2026-03-13：laptop 与树莓派均完成构建与启动验证，日志不再出现 `map_aruco_static_tf_node` 和 `rqt_image_view`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：`tvec_tf_node` 提示“尚未收到 /debug/tvec 数据”，怀疑两个 minimal 功能包没有收到视觉数据。
+  解答：排查后确认链路正常。两包在启动后均持续输出 `aruco_pose`，`/debug/tvec` 数据正常；该提示为启动初期未检测到 marker 的瞬时日志，不是持续故障。
+
+## 修改记录（本轮补充）
+- 2026-03-13：完成两包链路诊断（`usb_cam -> /image_raw -> tvec_rvec_node -> /debug/tvec -> tvec_tf_node`），确认数据流正常且可复现连续 `aruco_pose` 输出。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：`land_with_tracking` 功能包不需要拉起静态 TF 节点和 rqt。
+  解答：已完成。`land_with_tracking.launch.py` 不再包含 `tvec_tf.launch.py`，改为 `tvec.launch.py + tvec_tf_node`，并将 `use_rqt` 默认设为 `false`。
+
+## 修改记录（本轮补充）
+- 2026-03-13：更新 `src/land_with_tracking/launch/land_with_tracking.launch.py`，禁用静态 TF 链路与默认 rqt 拉起。
+- 2026-03-13：laptop 与树莓派均构建并启动验证通过，日志不再出现 `map_aruco_static_tf_node` 与 `rqt_image_view`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将两个 minimal 功能包 CSV 文件默认存储目录改到 `rasip_pi_ws` 工作空间的 `log` 下。
+  解答：已完成。两个包的 launch 默认参数与 csv_logger 节点参数默认值均改为 `/home/zjh/project/rasip_pi_ws/log/tracking_csv`，并在 laptop 与树莓派验证生效。
+
+## 修改记录（本轮补充）
+- 2026-03-13：更新 `aruco_tracking_minimal`、`body_frame_tracking_minimal` 的 `csv_output_dir/output_dir` 默认路径为 `~/project/rasip_pi_ws/log/tracking_csv`。
+- 2026-03-13：同步更新两个 README 的 CSV 路径说明。
+- 2026-03-13：laptop 与树莓派均构建并启动验证，日志输出路径已指向 `rasip_pi_ws/log/tracking_csv`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：如何在 `ros2 launch` 命令里修改 PID 参数。
+  解答：可在 launch 命令后追加 `--ros-args -p 参数名:=值`。已给出 `body_frame_tracking_minimal` 与 `aruco_tracking_minimal` 的可直接执行示例命令。
+
+## 修改记录（本轮补充）
+- 2026-03-13：新增 PID 参数在线覆盖命令说明（不改代码即可试参）。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：`ros2 launch` 使用 `--ros-args -p` 方式设置 PID 报参数错误，如何在启动命令里改 PID。
+  解答：已修复为 launch 参数方式。两个 minimal launch 新增 PID/死区参数声明并传入节点，可直接用 `kp_xy:=...` 形式覆盖。
+
+## 修改记录（本轮补充）
+- 2026-03-13：`body_frame_tracking_minimal.launch.py` 新增 PID 与死区相关 launch 参数并映射到 `body_frame_tracking_node`。
+- 2026-03-13：`aruco_tracking_minimal.launch.py` 新增 PID、z保持与死区相关 launch 参数并映射到 `aruco_tracking_node`。
+- 2026-03-13：更新两个 README，增加可直接执行的 PID 调参命令示例。
+- 2026-03-13：laptop 与树莓派均构建并启动验证通过（按 `kp_xy:=...` 命令可正常拉起）。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：对 `body_frame_tracking` 多组参数 CSV（1.csv、2.csv、kpxy=0.6、kpxy=0.8、kpxy=0.8,kdxy=0.2、kpxy=0.8,kdxy=0.05、kpxy=1.0,kdxy=0.05、kpxy=1.0,kdxy=0.05,kdyaw=0.05）做对比，找出更优参数并给出下一步调试方向。
+  解答：已完成量化分析。综合误差与抖动指标最优参数为 `kpxy=1.0,kdxy=0.05`；`kdxy=0.2` 抖动显著增大；`kdxy` 从 `0.2` 降到 `0.05` 后抖动明显改善。已给出下一步精细调参建议。
+
+## 修改记录（本轮补充）
+- 2026-03-13：基于 8 份 CSV 完成统一指标统计与排序（xy误差、yaw误差、测量抖动、控制抖动、丢码时长），形成下一步调参建议。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将多组 body_frame_tracking CSV 的关键参数作图，清晰展示各 PID 参数下 tracking 优劣。
+  解答：已完成，生成指标对比图、综合评分图、关键时序对比图与汇总表。
+
+## 修改记录（本轮补充）
+- 2026-03-13：基于 `~/桌面/3.13` 下 8 份 CSV 生成可视化结果（PNG + TSV），输出到 `~/桌面/3.13/plots`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：阅读 `rasip_pi_ws` 和 `simple_ws` 两个工作空间下的 `LOG.md`，总结今天之前七天的进展，限制约 150 字。
+  解答：已完成。通读两边日志后确认，今天之前七天内的有效进展主要集中在 2026-03-06 至 2026-03-08，核心包括视觉接口与位姿链路建设、TF/矩阵链路打通、`aruco_tracking` PID 跟踪控制迭代，以及 `rasip_pi_ws` 中相机标定链路和仓库同步。
+
+## 修改记录（本轮补充）
+- 2026-03-13：读取并汇总 `rasip_pi_ws/LOG.md` 与 `simple_ws/LOG.md` 的近七天记录，形成 150 字进展总结；同步补充本轮问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：可参考 `simple` 分支中的 `LOG.md` 以及 `questions` 目录下的 `LOG.md`，重新总结 2026-03-06 至 2026-03-13 的项目进展。
+  解答：已完成。改为基于 `origin/simple:LOG.md` 与 `origin/simple:questions/LOG.md` 汇总，确认进展覆盖视觉位姿链路、`land_with_tracking`/`body_frame_tracking`/两个 minimal 包与 CSV 记录功能，以及地面效应补偿、评价指标、CFD 与实机实验方案等研究文档；`simple` 远程分支截至 2026-03-13 的最近提交日期为 2026-03-12。
+
+## 修改记录（本轮补充）
+- 2026-03-13：按用户指定改为读取 `simple` 分支主日志与 `questions/LOG.md`，修正近七天项目进展总结口径。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：提供一段“本周进展”示例文字，要求模仿该语言风格描述项目进展。
+  解答：已完成。按照用户提供的周报语气，将本周项目进展改写为连续叙述风格，突出“本周完成内容、当前效果、存在问题、后续优化方向”等表达方式。
+
+## 修改记录（本轮补充）
+- 2026-03-13：根据用户提供的示例段落，调整本周进展总结的表述风格，并补充本轮问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：实现 `pid_tuning` 功能包升级方案，支持 X/Y 分轴 PID 精调，同时保留 `kp_xy/ki_xy/kd_xy` 兼容入口；并在结束时输出 RMSE/P95/cmd_jitter/max_stale/fresh_ratio 到终端与汇总 CSV。
+  解答：已完成。新增 `pid_tuning` 包并实现双轨参数接口、分轴优先级、Z 定高控制（`aruco_pose.z`）、`OFFBOARD && aruco_fresh=1` 指标统计、终端摘要输出与 `pid_tuning_summary.csv` 追加写入。
+
+## 修改记录（本轮补充）
+- 2026-03-13：新增 `src/pid_tuning/launch/pid_tuning.launch.py`，包含 `tvec` USB 链路、`tvec_tf_node`、`pid_tuning_node`、`pid_tuning_csv_logger_node`，并开放 `kp_xy` 与 `kp_x/kp_y` 双入口。
+- 2026-03-13：新增 `src/pid_tuning/pid_tuning/pid_tuning_node.py` 与 `pid_tuning_csv_logger_node.py`，实现参数优先级（分轴 > 粗调）、参数来源日志、指标计算与汇总 CSV 记录。
+- 2026-03-13：新增 `src/pid_tuning/README.md`，补充粗调/分轴/混合三种启动示例与结果路径说明。
+- 2026-03-13：更新 `src/pid_tuning/setup.py`、`package.xml`，补充 launch/README 安装项与 console_scripts；修复邮箱格式告警。
+- 2026-03-13：完成 `colcon build --packages-select pid_tuning` 构建与多组启动验证；`pid_tuning_summary.csv` 已新增 coarse/split/mix 参数快照记录。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将 `pid_tuning` 同步部署到树莓派并验证可运行。
+  解答：已完成。已将 `src/pid_tuning` 同步到树莓派 `rasip_pi_ws`，并在树莓派完成构建与启动自检；CSV 与汇总 CSV 均正常生成。
+
+## 修改记录（本轮补充）
+- 2026-03-13：树莓派（`10.250.57.110`）同步 `src/pid_tuning` 全目录到 `~/project/rasip_pi_ws/src/pid_tuning`。
+- 2026-03-13：树莓派执行 `colcon build --symlink-install --packages-select pid_tuning` 成功。
+- 2026-03-13：树莓派执行 `ros2 launch pid_tuning pid_tuning.launch.py use_rqt:=false kp_xy:=0.6 csv_prefix:=pi_pid_tuning_deploy_test` 限时启动验证成功，日志确认 `pid_tuning_node/csv_logger_node` 正常运行。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：在 `pid_tuning` 的 README 中补充 Yaw 方向与 Z 方向 PID 调参的 launch 命令。
+  解答：已完成。README 已新增“Yaw 方向调参”和“Z 方向调参（定高）”两个可直接执行命令示例。
+
+## 修改记录（本轮补充）
+- 2026-03-13：更新 `src/pid_tuning/README.md`，新增 yaw/z PID 调参启动命令示例。
+- 2026-03-13：执行 `colcon build --symlink-install --packages-select pid_tuning` 并 `source install/setup.bash` 验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：在 `pid_tuning` README 中再增加一条包含 `kp_x/kp_y` 精调输入的 launch 命令，并补充 CSV 文件地址说明。
+  解答：已完成。README 新增“X/Y 精调 + Yaw/Z 同时输入”实测命令，并补充单次 CSV 命名示例路径与树莓派实测 CSV 文件路径。
+
+## 修改记录（本轮补充）
+- 2026-03-13：更新 `src/pid_tuning/README.md`，新增 `kp_x/kp_y` 精调命令（含 `csv_prefix`、`kp_yaw`、`kp_z`、死区参数）。
+- 2026-03-13：README “输出与汇总”新增 CSV 文件地址示例（本地模式与树莓派实测路径）。
+- 2026-03-13：执行 `colcon build --symlink-install --packages-select pid_tuning` 并 `source install/setup.bash` 通过。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：`pid_tuning` 启动后 `tvec_tf_node` 提示“尚未收到 /debug/tvec 数据”，且 `use_rqt:=true` 看不到图像，要求排查并在树莓派实测。
+  解答：已完成。定位为图像订阅 QoS 与 USB 相机场景不匹配导致检测链路不稳定；已改为可配置且默认 `RELIABLE`，并在树莓派构建与启动验证通过，`tvec_tf_node` 可连续输出 `aruco_pose`。
+
+## 修改记录（本轮补充）
+- 2026-03-13：更新 `src/tvec/tvec/tvec_rvec_node.py`，新增参数 `image_qos_reliability`，默认 `reliable`，并按参数选择图像订阅 QoS。
+- 2026-03-13：更新 `src/tvec/launch/tvec.launch.py`，新增并透传 `image_qos_reliability` launch 参数。
+- 2026-03-13：更新 `src/pid_tuning/launch/pid_tuning.launch.py`，新增 USB 相机参数透传（`video_device/image_width/image_height/pixel_format/framerate/use_usb_cam`）及 `annotated_image_topic`、`image_qos_reliability`。
+- 2026-03-13：本地执行 `colcon build --symlink-install --packages-select tvec pid_tuning` 与启动验证，`/tvec/image_annotated` 已恢复发布。
+- 2026-03-13：树莓派同步上述修改并执行同样构建与启动验证通过，`tvec_tf_node` 日志持续输出 `aruco_pose`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将 `pid_tuning`、`aruco_tracking_minimal`、`body_frame_tracking_minimal` 三个功能包的相机默认帧率统一改为 30FPS。
+  解答：已完成。三包默认链路统一为 `framerate=30.0`，并通过三包启动日志确认均显示 `framerate: 30.000000` 与 `at 30 FPS`。
+
+## 修改记录（本轮补充）
+- 2026-03-13：更新 `src/tvec/launch/tvec.launch.py`，默认 `framerate` 从 `15.0` 改为 `30.0`（影响 `aruco_tracking_minimal` 与 `body_frame_tracking_minimal`）。
+- 2026-03-13：更新 `src/pid_tuning/launch/pid_tuning.launch.py`，默认 `framerate` 从 `15.0` 改为 `30.0`。
+- 2026-03-13：执行 `colcon build --symlink-install --packages-select tvec pid_tuning aruco_tracking_minimal body_frame_tracking_minimal` 并 `source install/setup.bash` 通过。
+- 2026-03-13：分别执行三包限时启动验证，日志确认均为 `30 FPS`，无 `ERROR/Traceback/process has died`。
+
+## 问题记录（本轮补充）
+- 2026-03-13 | 问题：将 30FPS 帧率改动同步到树莓派并测试。
+  解答：已完成。树莓派已同步并构建，通过三包启动日志确认默认帧率均为 30FPS。
+
+## 修改记录（本轮补充）
+- 2026-03-13：同步 30FPS 相关改动到树莓派 `~/project/rasip_pi_ws`（`tvec.launch.py`、`tvec_rvec_node.py`、`pid_tuning.launch.py`）。
+- 2026-03-13：树莓派构建通过：`colcon build --symlink-install --packages-select tvec pid_tuning aruco_tracking_minimal body_frame_tracking_minimal`。
+- 2026-03-13：树莓派实测 `pid_tuning`、`aruco_tracking_minimal`、`body_frame_tracking_minimal`，日志均为 `framerate: 30.000000`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：`body_frame_tracking` 与 `land_with_tracking` 的跟踪策略有哪些不同。
+  解答：已完成对比。`body_frame_tracking` 是单层 PID 跟踪控制（x/y/yaw，默认不控 z）；`land_with_tracking` 是任务状态机控制（先对齐、再悬停、再边跟踪边下降、最后触地后下压与 disarm），并融合 `extended_state/rel_alt/速度` 等落地判据。
+
+## 修改记录（本轮补充）
+- 2026-03-14：完成 `body_frame_tracking` 与 `land_with_tracking` 跟踪策略差异梳理，并补充本轮问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：把 `land_with_tracking` 中的跟踪逻辑替换为 `body_frame_tracking_minimal` 逻辑，并先使用同样的 PID 参数。
+  解答：已完成。`land_with_tracking` 的 `xy+yaw` 误差计算与控制输出已切换为 body-frame 版本（`ex=target_x-pose.x`、`ey=pose.y-target_y`、不再做 map 旋转）；默认 PID 调整为 `kp_track_xy=1.0, kd_track_xy=0.05, kp_yaw=1.10, kd_yaw=0.05`。
+
+## 修改记录（本轮补充）
+- 2026-03-14：更新 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py`：
+  1) 跟踪误差与控制律切换为 `body_frame_tracking_minimal` 同款；
+  2) 移除跟踪阶段对 `base_pose` 新鲜度与动态 yaw 旋转的依赖；
+  3) 默认 PID 改为与 body minimal 先对齐。
+- 2026-03-14：本地构建 `land_with_tracking` 并限时启动验证通过。
+- 2026-03-14：已同步到树莓派并构建 `land_with_tracking`，限时启动验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：分析 `pid_tuning_xy_fine_20260314_160112` 日志中“进入 OFFBOARD 后高度下掉”的原因并修复代码。
+  解答：已完成。日志显示 OFFBOARD 段 `sp_vz` 基本恒为 `-0.5`，且与实机高度响应方向相反，判定为 `pid_tuning` 的 z 方向发布符号与当前实机响应不一致；已修正为同号发布。
+
+## 修改记录（本轮补充）
+- 2026-03-14：更新 `src/pid_tuning/pid_tuning/pid_tuning_node.py`，将 z 速度发布从 `msg.velocity.z = -vz_body_flu` 改为 `msg.velocity.z = vz_body_flu`（并同步更新注释）。
+- 2026-03-14：本地执行 `colcon build --symlink-install --packages-select pid_tuning` 并限时启动验证通过。
+- 2026-03-14：同步到树莓派并执行同样构建与启动验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：将树莓派 `log/tracking_csv` 中的 `3.14` 和 `summary` 移动到桌面 `trackingcsv` 文件夹。
+  解答：已完成。已移动到 `/home/zjh/桌面/trackingcsv`，源目录已清理对应项。
+
+## 修改记录（本轮补充）
+- 2026-03-14：树莓派执行日志归档：`3.14` 目录与 `pid_tuning_summary.csv` 已从 `~/project/rasip_pi_ws/log/tracking_csv` 移动到 `~/桌面/trackingcsv`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：将树莓派桌面 `trackingcsv` 中的 `3.14` 和 `pid_tuning_summary.csv` 移动到 laptop 桌面 `trackingcsv`。
+  解答：已完成。两项内容已传输到 laptop 并在树莓派端删除原件，满足“移动”语义。
+
+## 修改记录（本轮补充）
+- 2026-03-14：完成树莓派到 laptop 的日志移动：`3.14` 目录与 `pid_tuning_summary.csv` 已落盘到 `/home/zjh/桌面/trackingcsv`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：分析 `3.14` 目录中的 CSV 与 summary，评估当天 PID 参数性能，并解释 `kp_xy` 较大时绕圈飞的可能原因。
+  解答：已完成。对 `3.14` 下 19 份 CSV 与 `pid_tuning_summary.csv` 进行对齐分析，筛出有效 `OFFBOARD` 数据并完成排序；给出最优参数区间与绕圈机理分析（高增益 + 姿态误差/时延/限幅耦合导致环绕轨迹）。
+
+## 修改记录（本轮补充）
+- 2026-03-14：完成 `3.14` 数据批量统计（RMSE/P95/指令抖动/符号翻转）与 summary 参数回填对齐，输出参数性能结论与调参建议。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：阅读 `~/project/v2_ar_track_landing` 下功能包并对比当前 `body_frame_tracking`，罗列不同之处。
+  解答：已完成。核心差异集中在 ROS 版本与通信链路（ROS1+ar_track_alvar vs ROS2+aruco_pose）、控制坐标系（LOCAL_NED 混合位置/速度 vs BODY_NED 纯速度）、任务逻辑边界（单节点含起降状态机 vs 纯跟踪控制节点）、以及 PID/容错实现方式（旧版阈值+简化 PD vs 结构化 PID+超时保护）。
+
+## 修改记录（本轮补充）
+- 2026-03-14：完成 `v2_ar_track_landing`（`v2_ar_track_landing.cpp`、`v2_ar_track_yaw_landing.cpp`、launch 与构建文件）与 `body_frame_tracking` 的逐项对照分析，并补充本轮问答记录。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：将 `AGENTS.md` 中的问题记录与修改记录迁移到 `LOG.md` 或 `PI_LOG.md`，并让 `AGENTS.md` 主要保留个人习惯和项目要求。
+  解答：已完成迁移。`AGENTS.md` 中历史“问题记录/修改记录”已整体迁移到 `LOG.md`；`AGENTS.md` 记录规则已改为：本机写 `LOG.md`，树莓派写 `PI_LOG.md`。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：清理 `AGENTS.md`，移除历史轮次日志内容，仅保留规范与参数说明。
+- 2026-03-14：将 `AGENTS.md` 内首段“问题记录（本轮补充）”起的全部历史记录迁移到 `LOG.md`（新增“从 AGENTS 迁移的记录（2026-03-14）”章节）。
+- 2026-03-14：更新 `AGENTS.md` 协作规则：日志统一写入 `LOG.md` 与 `PI_LOG.md`，并修正日志链接路径为 `rasip_pi_ws`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：机体系速度控制下，yaw 变化会导致速度向量出现切向分量（不再指向 ArUco 中心），且 yaw rate 越大偏差越明显，如何减小该偏差。
+  解答：已给出抑制策略：优先改为世界系速度控制；若保留机体系，则加入时延-角速度前馈旋转补偿（`Δψ=ω_z*τ`）、yaw 对齐门控（未对齐时衰减 XY）、限制 yaw rate 与 XY 同时大动作、提高控制频率并降低感知/传输时延。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：补充记录“机体系切向速度偏差”问题及工程化修正建议到 `LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：将控制改为世界系是否就是 `aruco_tracking` 的逻辑。
+  解答：方向上接近，但不完全等同。`aruco_tracking` 的核心是把误差统一到固定坐标系（通常 map）后再做控制，能显著减小机体系随 yaw 变化导致的切向偏差；但是否“完全一致”还取决于具体实现细节（速度发布坐标系、动态 yaw 旋转补偿、门控与限幅、定高/状态机等）。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：补充“世界系控制与 aruco_tracking 关系”问答到 `LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：为什么“世界系控制”与 `aruco_tracking` 不是完全等价，要求给出具体差异。
+  解答：已完成代码级对照。两者核心思想一致（误差统一到固定系），但在控制消息接口、坐标系语义、z 轴策略、动态 yaw 估计路径、安全门控与状态机边界上存在实现差异，因此不能简单视为“完全等同”。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：补充“世界系控制 vs aruco_tracking 非完全等价”的具体对照结论到 `LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：使用 `aruco_tracking` 的逻辑，是否可以消除绕圈现象。
+  解答：可以显著降低绕圈概率，但不能保证在所有工况下“完全消除”。在 yaw 对齐不足、时延较大、角速度过高、视觉抖动或丢码时，仍可能出现残余切向分量。工程上可通过 yaw 门控、角速度限幅、时延补偿与增益整定进一步压制。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：补充“采用 aruco_tracking 逻辑对绕圈抑制效果”的问答记录到 `LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：限制 `yaw_rate` 和 `v_xy` 最大值是否能改善绕圈，对跟踪精度影响如何。
+  解答：能有效改善绕圈，尤其在 yaw 误差较大与链路时延存在时；但会降低瞬态收敛速度。合理整定下，稳态精度通常不降反升（抖动更小、超调更低），主要代价是到达目标更慢。
+
+## 修改记录（本轮补充）
+### 工作空间与协作规范
+- 2026-03-14：补充“`yaw_rate`/`v_xy` 限幅对绕圈与精度影响”问答到 `LOG.md`。
+
+## 问题记录（本轮补充）
+- 2026-03-14 | 问题：在 `pid_tuning` 结束后，能否自动把本次 log 文件和 summary 更新同步到 laptop 桌面的 `trackingcsv`。
+  解答：已完成。`pid_tuning_csv_logger_node` 新增“结束自动同步”能力：默认将本次运行 CSV 与 `pid_tuning_summary.csv` 复制到 `~/桌面/trackingcsv`；并支持 `sync_cmd` 自定义命令，可在树莓派结束时通过 `rsync/scp` 直传 laptop。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### pid_tuning
+- 2026-03-14：更新 `src/pid_tuning/pid_tuning/pid_tuning_csv_logger_node.py`，新增参数 `sync_on_shutdown/sync_target_dir/sync_copy_run_csv/sync_copy_summary_csv/sync_cmd`，并在节点退出时执行自动同步。
+- 2026-03-14：更新 `src/pid_tuning/launch/pid_tuning.launch.py`，新增并透传上述同步参数。
+- 2026-03-14：更新 `src/pid_tuning/README.md`，新增“结束自动同步到桌面”说明与 `sync_cmd` 示例。
+- 2026-03-14：执行 `colcon build --symlink-install --packages-select pid_tuning` 并 `source install/setup.bash`。
+- 2026-03-14：执行 `timeout 12s ros2 launch pid_tuning pid_tuning.launch.py use_rqt:=false enable_z_hold:=false sync_on_shutdown:=false` 限时自检通过（节点均正常拉起，无报错退出）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：将 simple 分支中的“最小 MAVROS 启动功能包”复制到 laptop 和树莓派并构建。
+  解答：已完成。确认目标包为 `src/mavros_profiles`（含 `workspace_minimal_px4.launch.py`），已同步到 laptop 与树莓派 `rasip_pi_ws/src`，并在两端分别完成构建验证通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### mavros_profiles
+- 2026-03-15：从 `origin/simple` 检出 `src/mavros_profiles` 到本地工作空间。
+- 2026-03-15：laptop 执行 `colcon build --symlink-install --packages-select mavros_profiles` 并 `source install/setup.bash`，`ros2 pkg list` 可见 `mavros_profiles`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：在 laptop 与树莓派主要做实机实验，希望 `mavros_profiles` 的串口信息默认改成与 `mavros px4.launch` 一致。
+  解答：已完成。默认 `fcu_url` 已改为 `/dev/ttyS0:921600`，与树莓派当前 `mavros px4.launch` 保持一致；并保留 launch 参数可覆盖。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### mavros_profiles
+- 2026-03-15：更新 `src/mavros_profiles/launch/workspace_minimal_px4.launch.py`，`fcu_url` 默认值从 `udp://:14540@127.0.0.1:14557` 改为 `/dev/ttyS0:921600`。
+- 2026-03-15：更新 `src/mavros_profiles/README.md`，将默认启动说明改为实机串口默认，并补充覆盖示例。
+- 2026-03-15：laptop 执行 `colcon build --symlink-install --packages-select mavros_profiles` 并启动自检通过（使用 `fcu_url:=udp://...` 覆盖验证 launch 正常）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：树莓派 `log` 和 `summary` CSV 格式异常，要求修复（仅处理 CSV 文件）。
+  解答：已完成。对树莓派 `~/project/rasip_pi_ws/log/tracking_csv` 下全部 CSV 执行格式修复：统一行结束符为 LF，并检查 `pid_tuning_summary.csv` 表头重复；修复后文件中已无 `\r`。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：远程检查树莓派 `pid_tuning_summary.csv`，确认存在 CRLF 显示异常风险。
+- 2026-03-15：执行一次性修复脚本：标准化 `tracking_csv` 下全部 CSV 的行结束符，清理 summary 重复表头（本次无需去重）。
+- 2026-03-15：复核结果：`files_with_CR=0`，summary 头部与数据行格式正常。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：树莓派 CSV 在表格软件中未分列，全部集中到一列，要求分列。
+  解答：已完成。确认原始 CSV 数据列正常（46/48 列），问题为表格软件分隔符识别；已在树莓派生成可直接分列打开版本（`_excel.csv` 与 `.tsv`）。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：抽样校验 `pid_tuning_summary.csv` 与运行 CSV，`csv.reader` 可正常解析为多列。
+- 2026-03-15：在树莓派生成 `split_columns` 目录，批量转换 17 个 CSV 为 `*_excel.csv`（`;` 分隔 + UTF-8 BOM）和 `*.tsv`（TAB 分隔）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：将树莓派中的 `3.15` 与 `summary` 复制到 laptop 桌面。
+  解答：已完成。已从树莓派复制 `~/project/rasip_pi_ws/log/tracking_csv/3.15` 到 laptop `~/桌面/3.15`，并复制 `pid_tuning_summary.csv` 到 laptop `~/桌面/pid_tuning_summary.csv`。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：执行 `scp -r` 同步 `3.15` 目录到 laptop 桌面。
+- 2026-03-15：执行 `scp` 同步 `pid_tuning_summary.csv` 到 laptop 桌面并完成落盘校验。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：分析今天（3.15）的 PID 调参数据。
+  解答：已完成。基于 `~/桌面/trackingcsv/3.15` 的原始 CSV 重新计算 `OFFBOARD+fresh` 指标并排序，得到最佳/最差组及参数趋势；同时识别到桌面 `pid_tuning_summary.csv` 尚未包含 3.15 新行（仅到 3.14），本次分析改用原始 CSV 统计。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：对 `~/桌面/trackingcsv/3.15` 下 19 个 CSV 执行统一指标重算（有效 14，样本不足 5）。
+- 2026-03-15：输出分析汇总文件 `~/桌面/trackingcsv/3.15_analysis_summary.tsv`（含每次实验的 RMSE/P95/jitter 与参数快照）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：今天数据中哪些组出现绕圈，以及绕圈原因总结。
+  解答：已完成。基于 `3.15` 原始 CSV 计算“角度累计变化 + 切向速度占比 + 半径收敛量”得到绕圈风险排序，已输出 `~/桌面/trackingcsv/3.15_circling_rank.tsv`。高风险主要集中在 `ki_x/ki_y=0.02` 组和部分 `kp=0.85,kd=0.05` 组；典型现象为角度变化大、半径收敛慢或回弹。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：对 `~/桌面/trackingcsv/3.15` 的 14 个有效 run 执行绕圈判据分析，输出排序文件 `3.15_circling_rank.tsv`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`pid_tuning` 用于追踪 0.5~1.0m/s 移动车载二维码时，现有方案还需哪些改进。
+  解答：已完成评估。当前 `pid_tuning` 为纯 PID 相对误差控制，缺少目标速度前馈与时延补偿，易出现滞后和绕圈。建议优先提升 `vxy_limit`、收紧 `pose_timeout_sec`、关闭积分、加入 yaw 对齐门控与前馈项，并将 Z 保持与横向跟踪解耦。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：完成 `pid_tuning` 动态目标场景适配评估，输出“必须改/建议改/参数起点”清单（本轮未改代码）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：动态追踪里“目标速度”该如何获取。
+  解答：可按可靠性分三层获取：1) 视觉位姿差分估计（最通用）；2) 目标端里程计/轮速直接发布（最准确）；3) 两者融合（推荐）。工程上需配套低通滤波、异常值剔除与时间戳对齐。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：补充动态目标速度获取方案与工程化注意项（本轮未改代码）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`pid_tuning` 启动命令里能否单独修改 `vx_limit` 和 `vy_limit`。
+  解答：已实现。新增 `vx_limit`、`vy_limit` launch 参数；未设置时自动回退到 `vxy_limit`，兼容原有命令。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### pid_tuning
+- 2026-03-15：更新 `pid_tuning_node.py`，新增参数 `vx_limit`、`vy_limit`（默认 `nan`），并实现回退逻辑：未设置时使用 `vxy_limit`。
+- 2026-03-15：`pid_x`/`pid_y` 输出限幅改为分别使用 `vx_limit`/`vy_limit`。
+- 2026-03-15：更新 `pid_tuning.launch.py`，新增并透传 `vx_limit`、`vy_limit` 参数。
+- 2026-03-15：更新 `pid_tuning/README.md`，新增 X/Y 速度上限分开设置示例。
+- 2026-03-15：执行 `colcon build --symlink-install --packages-select pid_tuning` 并 `source install/setup.bash`。
+- 2026-03-15：执行 `timeout 10s ros2 launch pid_tuning pid_tuning.launch.py use_rqt:=false enable_z_hold:=false sync_on_shutdown:=false vx_limit:=1.2 vy_limit:=0.8` 启动自检通过（日志确认新限幅参数生效）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：不加目标速度前馈时，增加 `ki` 是否也能减小稳态误差。
+  解答：可以在一定程度上减小稳态误差，但对动态目标会带来更明显的相位滞后和绕圈风险；`ki` 应小步增加并配合积分限幅/抗饱和，优先用于消除小偏置，不建议替代速度前馈。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：补充“积分项与速度前馈在动态跟踪中的作用差异”调参建议（本轮未改代码）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：`v_target ≈ (p_k - p_{k-1}) / dt` 是否考虑了本机速度，这个前馈项是否是相对速度。
+  解答：若 `p` 来自相对位姿（如 `aruco_pose`），差分得到的是相对速度 `v_rel = v_target - v_uav`（同一坐标系下）。它已包含本机运动影响，不是目标绝对速度。若需目标绝对速度，应在同坐标系下做 `v_target = v_rel + v_uav` 后再用于前馈。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：补充“相对速度/绝对速度与前馈项定义”说明，避免动态跟踪时前馈符号和坐标系混用。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：新增 `dynamic_tracking` 功能包，在 `pid_tuning` 基础上增加目标速度前馈，并支持 launch 命令直接覆写参数；同时同步到树莓派并构建。
+  解答：已完成。新包已创建并本地验证启动通过；控制节点新增相对位姿差分前馈（可开关、可调增益/滤波/超时），launch 已支持参数覆盖，且已同步树莓派构建成功。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### dynamic_tracking
+- 2026-03-15：从 `pid_tuning` 派生创建 `src/dynamic_tracking`（`ament_python`）。
+- 2026-03-15：新增节点 `dynamic_tracking_node.py`，在 PID 输出上叠加目标速度前馈（基于 `aruco_pose` 差分估计 `rel_vx/rel_vy`），新增参数：`enable_velocity_ff`、`ff_gain_x`、`ff_gain_y`、`ff_filter_alpha`、`ff_timeout_sec`。
+- 2026-03-15：新增 launch `dynamic_tracking.launch.py`，支持与 `pid_tuning` 同风格参数覆写，并透传前馈参数与 `vx_limit/vy_limit`。
+- 2026-03-15：更新 `dynamic_tracking/README.md`，新增可直接执行的完整命令示例。
+- 2026-03-15：本地执行 `colcon build --symlink-install --packages-select dynamic_tracking` 并限时启动验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：将 `pid_tuning` 的一套参数应用到 `land_with_tracking`，并把跟踪逻辑对齐 `pid_tuning`。
+  解答：已完成。`land_with_tracking` 已支持 X/Y 分轴 PID（兼容 `kp_track_xy` 旧参数回退），默认参数改为你给定的 `kp/ki/kd` 组合，并将跟踪误差计算与 deadband 处理对齐到 `pid_tuning` 实现；已构建并启动验证通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-15：更新 `land_with_tracking_node.py` 参数默认值为：`kp_track_xy=0.6`、`ki_track_xy=0.02`、`kd_track_xy=0.02`、`kp_yaw=0.60`、`ki_yaw=0.02`、`kd_yaw=0.03`、`velocity_deadband=0.03`、`yaw_rate_deadband=0.03`。
+- 2026-03-15：新增分轴参数 `kp_x/ki_x/kd_x`、`kp_y/ki_y/kd_y`（`NaN` 表示未显式设置），并实现优先级“分轴参数优先，否则回退 `kp_track_xy/ki_track_xy/kd_track_xy`”。
+- 2026-03-15：跟踪控制计算保持与 `pid_tuning` 一致：`ex=target_x-pose.x`、`ey=pose.y-target_y`、`eyaw=target_yaw-pose.yaw`，再经 PID 与 deadband 输出。
+- 2026-03-15：更新 `land_with_tracking.launch.py`，新增并透传 `kp_x/ki_x/kd_x`、`kp_y/ki_y/kd_y`、`kp_yaw/ki_yaw/kd_yaw`、`max_vxy`、`velocity_deadband`、`yaw_rate_deadband`，默认值与本轮参数一致。
+- 2026-03-15：执行 `colcon build --packages-select land_with_tracking --symlink-install` 并 `source install/setup.bash`。
+- 2026-03-15：执行 `timeout 25s ros2 launch land_with_tracking land_with_tracking.launch.py use_rqt:=false` 启动验证通过（节点拉起正常，日志确认 PID 参数生效，`usb_cam` 为 30FPS）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：将 `land_with_tracking` 的下降速度调低到 `0.3m/s`。
+  解答：已完成。已将节点默认参数、launch 默认参数与 README 描述统一更新为 `0.3m/s`，并完成构建、source 与启动验证（无报错）。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-15：更新 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py`，参数 `descent_speed_mps` 默认值由 `0.5` 调整为 `0.3`。
+- 2026-03-15：更新 `src/land_with_tracking/launch/land_with_tracking.launch.py`，透传参数 `descent_speed_mps` 默认值由 `0.5` 调整为 `0.3`。
+- 2026-03-15：更新 `src/land_with_tracking/README.md`，下降策略描述由 `0.5m/s` 调整为 `0.3m/s`。
+- 2026-03-15：执行 `colcon build --packages-select land_with_tracking --symlink-install` 并 `source install/setup.bash`。
+- 2026-03-15：执行 `timeout 20s ros2 launch land_with_tracking land_with_tracking.launch.py use_rqt:=false` 启动验证通过（进程可正常拉起，无异常退出）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：机体左右方向控制量给反，要求结合 CSV 确认并修复。
+  解答：已修复 `land_with_tracking` 的 Y 轴发布符号。说明：本机 `log/tracking_csv` 中现有文件未包含有效 `OFFBOARD+fresh` 样本（无法直接从这些旧 CSV 做充分统计确认），但结合你现场表现与 `body_frame_tracking` 的实机发布语义，对 `cmd_vel.y` 做取反修正后完成构建与启动验证。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-15：更新 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py` 的 `publish_cmd()`，将 `msg.twist.linear.y` 由 `vy` 改为 `-vy`，修复左右控制反向问题。
+- 2026-03-15：执行 `colcon build --packages-select land_with_tracking --symlink-install` 并 `source install/setup.bash`。
+- 2026-03-15：执行 `timeout 20s ros2 launch land_with_tracking land_with_tracking.launch.py use_rqt:=false` 启动验证通过（无报错退出）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：分析树莓派最新两个 CSV，并把反向控制量调回。
+  解答：已完成。经 SSH 分析树莓派 `pid_tuning_xy_fine_20260315_141429.csv` 和 `pid_tuning_xy_fine_20260315_141025.csv`，`OFFBOARD+fresh` 条件下 `corr(aruco_y, sp_vy)` 分别约 `-0.970/-0.972`；随后已将 `land_with_tracking` 的 `cmd_vel.y` 从取反改回同号发布，并完成本地与树莓派构建验证。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking
+- 2026-03-15：更新 `src/land_with_tracking/land_with_tracking/land_with_tracking_node.py`，`publish_cmd()` 中 y 通道由 `-vy` 调回 `vy`。
+- 2026-03-15：本地执行 `colcon build --packages-select land_with_tracking --symlink-install`、`source install/setup.bash`，并 `timeout 15s ros2 launch land_with_tracking land_with_tracking.launch.py use_rqt:=false` 验证通过。
+- 2026-03-15：通过 SSH 将该文件同步到树莓派，并在树莓派执行 `colcon build --packages-select land_with_tracking --symlink-install` 验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：新建 `track_with_land_v2` 功能包（流程同 land_with_tracking，跟踪逻辑参考 pid_tuning，参数按指定默认值），并同步到树莓派构建。
+  解答：已完成。新包已创建并本地构建+launch 验证通过，随后已同步树莓派并构建通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### track_with_land_v2
+- 2026-03-15：基于 `land_with_tracking` 派生新包 `src/track_with_land_v2`，完成包名、节点名、资源索引、launch 与 README 全量重命名。
+- 2026-03-15：新增 `launch/track_with_land_v2.launch.py`，默认流程为“对齐 -> 悬停1s -> 0.3m/s下降跟踪 -> 末段下压并周期 disarm”。
+- 2026-03-15：跟踪 PID 默认参数设置为：`kp_x/ki_x/kd_x=0.6/0.02/0.02`、`kp_y/ki_y/kd_y=0.6/0.02/0.02`、`kp_yaw/ki_yaw/kd_yaw=0.60/0.02/0.03`、`velocity_deadband=0.03`、`yaw_rate_deadband=0.03`。
+- 2026-03-15：为与 `pid_tuning` 命令兼容，新增 launch 与节点参数入口：`target_z`、`kp_z`、`ki_z`、`kd_z`（用于统一调参输入与记录）。
+- 2026-03-15：本地执行 `colcon build --packages-select track_with_land_v2 --symlink-install`、`source install/setup.bash`，并执行 `timeout 18s ros2 launch track_with_land_v2 track_with_land_v2.launch.py use_rqt:=false` 启动验证通过。
+- 2026-03-15：通过 SSH 将 `src/track_with_land_v2` 同步到树莓派并完成树莓派构建验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：查看树莓派最新 CSV，反馈机体系左右误差发散，要求修正代码。
+  解答：已完成。检查树莓派最新 CSV（`pid_tuning_xy_fine_20260315_141429.csv`、`pid_tuning_xy_fine_20260315_141025.csv`）后，`corr(aruco_y, sp_vy)` 约为 `-0.970/-0.972`，说明 `pid_tuning` 链路符号正常；针对你反馈的 `track_with_land_v2(cmd_vel)` 左右发散，已将该包 y 通道发布符号改为取反，并完成本地/树莓派构建验证。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### track_with_land_v2
+- 2026-03-15：更新 `src/track_with_land_v2/track_with_land_v2/track_with_land_v2_node.py`，`publish_cmd()` 中 `msg.twist.linear.y` 由 `vy` 调整为 `-vy`。
+- 2026-03-15：执行 `colcon build --packages-select track_with_land_v2 --symlink-install`、`source install/setup.bash`，并执行 `timeout 15s ros2 launch track_with_land_v2 track_with_land_v2.launch.py use_rqt:=false` 启动验证通过。
+- 2026-03-15：同步修改到树莓派并执行 `colcon build --packages-select track_with_land_v2 --symlink-install` 验证通过。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：分析树莓派 `pid_tuning_xy_fine_20260315_155129`，判断 `target_z=1m` 是否提升精度，并给出 1m 丢码改进方案。
+  解答：已完成。对比同日 `target_z=2.5m` 两条基线后，`1m` 在“有码样本”上的误差更小（`rmse_xy≈0.283`，优于 `0.45~0.47`），但可见性更差（`fresh_ratio≈0.704`，低于 `0.81~0.82`，且最长连续丢码约 `10.97s`）。结论是“降高度不必然提升整体跟踪质量”，因为可见时精度和可见性是两个维度；1m 主要瓶颈是丢码与重捕获能力。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-15：通过 SSH 解析树莓派 `tracking_csv`，输出 `OFFBOARD+fresh` 指标对比（1m vs 2.5m）与长丢码段统计（`max_stale≈10.97s`）。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：删除 `track_with_land_v2` 功能包，并提交 Git 后推送远程。
+  解答：已完成本地删除。该目录此前为未跟踪状态（`?? src/track_with_land_v2/`），删除后不会形成 Git 文件删除差异；已按本轮记录执行提交与远程推送。
+
+## 修改记录（本轮补充）
+### 工作空间整理
+- 2026-03-15：删除目录 `src/track_with_land_v2`。

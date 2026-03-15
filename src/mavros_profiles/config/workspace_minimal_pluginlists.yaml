@@ -1,0 +1,21 @@
+/**:
+  ros__parameters:
+    # 先全禁用，再只放开工作空间功能包实际用到的最小插件集合。
+    plugin_denylist:
+      - '*'
+
+    plugin_allowlist:
+      # /mavros/state、/mavros/extended_state
+      - 'sys_*'
+      # /mavros/cmd/arming
+      - 'command'
+      # /mavros/local_position/pose、/velocity_local
+      - 'local_position'
+      # /mavros/global_position/global、/rel_alt
+      - 'global_position'
+      # /mavros/home_position/home
+      - 'home_position'
+      # /mavros/setpoint_velocity/cmd_vel
+      - 'setpoint_velocity'
+      # /mavros/setpoint_raw/local
+      - 'setpoint_raw'

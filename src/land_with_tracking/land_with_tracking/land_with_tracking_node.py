@@ -89,16 +89,25 @@ class LandWithTrackingNode(Node):
         self.declare_parameter('hover_after_align_sec', 1.0)
 
         # ===== PID 参数 =====
-        self.declare_parameter('kp_track_xy', 0.5)
-        self.declare_parameter('ki_track_xy', 0.0)
-        self.declare_parameter('kd_track_xy', 0.08)
+        # 兼容参数：沿用历史的统一 XY 参数入口。
+        self.declare_parameter('kp_track_xy', 0.6)
+        self.declare_parameter('ki_track_xy', 0.02)
+        self.declare_parameter('kd_track_xy', 0.02)
+        # 分轴参数：与 pid_tuning 逻辑对齐，支持单独调 X/Y。
+        # 默认给出与你当前调参命令一致的值。
+        self.declare_parameter('kp_x', float('nan'))
+        self.declare_parameter('ki_x', float('nan'))
+        self.declare_parameter('kd_x', float('nan'))
+        self.declare_parameter('kp_y', float('nan'))
+        self.declare_parameter('ki_y', float('nan'))
+        self.declare_parameter('kd_y', float('nan'))
 
-        self.declare_parameter('kp_yaw', 1.2)
-        self.declare_parameter('ki_yaw', 0.0)
-        self.declare_parameter('kd_yaw', 0.08)
+        self.declare_parameter('kp_yaw', 0.60)
+        self.declare_parameter('ki_yaw', 0.02)
+        self.declare_parameter('kd_yaw', 0.03)
 
         # ===== 下降与落地参数 =====
-        self.declare_parameter('descent_speed_mps', 0.5)
+        self.declare_parameter('descent_speed_mps', 0.3)
         self.declare_parameter('land_rel_alt_threshold_m', 0.15)
         self.declare_parameter('land_vz_abs_max_mps', 0.20)
         self.declare_parameter('land_vxy_abs_max_mps', 0.25)
@@ -114,7 +123,7 @@ class LandWithTrackingNode(Node):
         self.declare_parameter('max_vz', 0.8)
         self.declare_parameter('max_wz', 1.0)
         self.declare_parameter('velocity_deadband', 0.03)
-        self.declare_parameter('yaw_rate_deadband', 0.02)
+        self.declare_parameter('yaw_rate_deadband', 0.03)
         self.declare_parameter('require_offboard', True)
         self.declare_parameter('start_on_offboard_entry', True)
         self.declare_parameter('use_dynamic_marker_yaw', True)
@@ -141,6 +150,12 @@ class LandWithTrackingNode(Node):
         kp_track_xy = float(self.get_parameter('kp_track_xy').value)
         ki_track_xy = float(self.get_parameter('ki_track_xy').value)
         kd_track_xy = float(self.get_parameter('kd_track_xy').value)
+        kp_x_raw = float(self.get_parameter('kp_x').value)
+        ki_x_raw = float(self.get_parameter('ki_x').value)
+        kd_x_raw = float(self.get_parameter('kd_x').value)
+        kp_y_raw = float(self.get_parameter('kp_y').value)
+        ki_y_raw = float(self.get_parameter('ki_y').value)
+        kd_y_raw = float(self.get_parameter('kd_y').value)
 
         kp_yaw = float(self.get_parameter('kp_yaw').value)
         ki_yaw = float(self.get_parameter('ki_yaw').value)
@@ -168,9 +183,17 @@ class LandWithTrackingNode(Node):
         self.fallback_marker_in_map_yaw_deg = float(self.get_parameter('fallback_marker_in_map_yaw_deg').value)
         self.disarm_retry_interval_sec = float(self.get_parameter('disarm_retry_interval_sec').value)
 
+        # 参数优先级与 pid_tuning 保持一致：分轴参数 > 兼容参数。
+        self.kp_x = kp_x_raw if math.isfinite(kp_x_raw) else kp_track_xy
+        self.ki_x = ki_x_raw if math.isfinite(ki_x_raw) else ki_track_xy
+        self.kd_x = kd_x_raw if math.isfinite(kd_x_raw) else kd_track_xy
+        self.kp_y = kp_y_raw if math.isfinite(kp_y_raw) else kp_track_xy
+        self.ki_y = ki_y_raw if math.isfinite(ki_y_raw) else ki_track_xy
+        self.kd_y = kd_y_raw if math.isfinite(kd_y_raw) else kd_track_xy
+
         # ===== PID 初始化 =====
-        self.pid_track_x = PIDController(kp_track_xy, ki_track_xy, kd_track_xy, out_limit=self.max_vxy)
-        self.pid_track_y = PIDController(kp_track_xy, ki_track_xy, kd_track_xy, out_limit=self.max_vxy)
+        self.pid_track_x = PIDController(self.kp_x, self.ki_x, self.kd_x, out_limit=self.max_vxy)
+        self.pid_track_y = PIDController(self.kp_y, self.ki_y, self.kd_y, out_limit=self.max_vxy)
         self.pid_yaw = PIDController(kp_yaw, ki_yaw, kd_yaw, out_limit=self.max_wz)
 
         # ===== 运行状态 =====
@@ -255,6 +278,13 @@ class LandWithTrackingNode(Node):
             f'rel_alt={self.rel_alt_topic} | vel={self.vel_local_topic} | '
             f'aruco={self.aruco_pose_topic} | base_pose={self.base_pose_topic} | '
             f'cmd={self.cmd_vel_topic} | arming_srv={self.arming_service}'
+        )
+        self.get_logger().info(
+            '跟踪PID参数 | '
+            f'X=({self.kp_x:.3f},{self.ki_x:.3f},{self.kd_x:.3f}) '
+            f'Y=({self.kp_y:.3f},{self.ki_y:.3f},{self.kd_y:.3f}) '
+            f'Yaw=({kp_yaw:.3f},{ki_yaw:.3f},{kd_yaw:.3f}) | '
+            f'deadband(v={self.velocity_deadband:.3f}, yaw={self.yaw_rate_deadband:.3f})'
         )
 
     @staticmethod
@@ -395,28 +425,24 @@ class LandWithTrackingNode(Node):
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.twist.linear.x = float(vx)
+        # 本节点使用 mavros/setpoint_velocity/cmd_vel（TwistStamped）链路，
+        # 按当前实机语义，y 通道保持与控制器输出同号。
         msg.twist.linear.y = float(vy)
         msg.twist.linear.z = float(vz)
         msg.twist.angular.z = float(wz)
         self.cmd_pub.publish(msg)
 
     def compute_tracking_cmd(self):
-        """计算 XY+Yaw 闭环控制量（不含 z）。"""
+        """计算 XY+Yaw 闭环控制量（不含 z），逻辑对齐 body_frame_tracking_minimal。"""
+        # 与 body_frame_tracking_minimal 保持一致：
+        # ex = target_x - pose.x
+        # ey = pose.y - target_y  （y 方向按实测符号修正）
         ex_m = self.track_target_x - float(self.aruco_pose.x)
-        ey_m = self.track_target_y - float(self.aruco_pose.y)
+        ey_m = float(self.aruco_pose.y) - self.track_target_y
         eyaw = self.wrap_to_pi(self.track_target_yaw - float(self.aruco_pose.yaw))
 
-        if self.use_dynamic_marker_yaw:
-            if not self.is_base_pose_fresh():
-                return None
-            yaw_map_marker = self.wrap_to_pi(self.base_yaw - float(self.aruco_pose.yaw))
-        else:
-            yaw_map_marker = math.radians(self.fallback_marker_in_map_yaw_deg)
-
-        ex_cmd, ey_cmd = self.rotate_xy(ex_m, ey_m, yaw_map_marker)
-
-        vx = self.apply_deadband(self.pid_track_x.update(ex_cmd), self.velocity_deadband)
-        vy = self.apply_deadband(self.pid_track_y.update(ey_cmd), self.velocity_deadband)
+        vx = self.apply_deadband(self.pid_track_x.update(ex_m), self.velocity_deadband)
+        vy = self.apply_deadband(self.pid_track_y.update(ey_m), self.velocity_deadband)
         wz = self.apply_deadband(self.pid_yaw.update(eyaw), self.yaw_rate_deadband)
         return vx, vy, wz, ex_m, ey_m, eyaw
 
@@ -453,14 +479,7 @@ class LandWithTrackingNode(Node):
                 self.align_start_time = None
                 return
 
-            track_cmd = self.compute_tracking_cmd()
-            if track_cmd is None:
-                self.publish_cmd(0.0, 0.0, 0.0, 0.0)
-                self.latest_status = f'阶段={self.phase} | base_pose 超时，输出零速等待'
-                self.align_start_time = None
-                return
-
-            vx, vy, wz, ex_m, ey_m, eyaw = track_cmd
+            vx, vy, wz, ex_m, ey_m, eyaw = self.compute_tracking_cmd()
 
             # 阶段1：先严格对齐 ArUco。
             if self.phase == self.PHASE_ALIGN:

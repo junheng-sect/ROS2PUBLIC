@@ -23,7 +23,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'fcu_url',
-            default_value='udp://:14540@127.0.0.1:14557',
+            default_value='/dev/ttyS0:921600',
             description='MAVLink FCU connection URL',
         ),
         DeclareLaunchArgument(

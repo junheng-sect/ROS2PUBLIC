@@ -38,6 +38,7 @@ class TVecRVecNode(Node):
         self.declare_parameter('dist_k3', 0.0)
         self.declare_parameter('marker_size_33', 0.193)
         self.declare_parameter('marker_size_42', 0.025)
+        self.declare_parameter('image_qos_reliability', 'reliable')
         self.declare_parameter('enable_csv_log', True)
         self.declare_parameter(
             'csv_log_path',
@@ -56,6 +57,7 @@ class TVecRVecNode(Node):
         self.k3 = float(self.get_parameter('dist_k3').value)
         self.marker_size_33 = float(self.get_parameter('marker_size_33').value)
         self.marker_size_42 = float(self.get_parameter('marker_size_42').value)
+        self.image_qos_reliability = str(self.get_parameter('image_qos_reliability').value).strip().lower()
         self.enable_csv_log = bool(self.get_parameter('enable_csv_log').value)
         self.csv_path = self.get_parameter('csv_log_path').value
 
@@ -66,8 +68,13 @@ class TVecRVecNode(Node):
         # 发布调试位姿向量：用于 `ros2 topic echo /debug/tvec` 实时查看 tvec/rvec。
         self.debug_tvec_pub = self.create_publisher(TVecRVec, '/debug/tvec', 10)
 
-        # 仿真桥接图像通常使用 BEST_EFFORT，QoS 需对齐以避免不兼容。
-        qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=10)
+        # 图像 QoS 默认按实机 USB 相机使用 RELIABLE；
+        # 如需兼容某些仿真链路可传 image_qos_reliability:=best_effort。
+        if self.image_qos_reliability == 'best_effort':
+            reliability = ReliabilityPolicy.BEST_EFFORT
+        else:
+            reliability = ReliabilityPolicy.RELIABLE
+        qos = QoSProfile(reliability=reliability, depth=10)
         self.image_sub = self.create_subscription(Image, self.image_topic, self.image_callback, qos)
 
         # ArUco 检测接口兼容处理：
@@ -105,7 +112,9 @@ class TVecRVecNode(Node):
         self._init_csv()
 
         self.log_timer = self.create_timer(1.0, self.log_callback)
-        self.get_logger().info(f'tvec/rvec test node started | sub={self.image_topic}')
+        self.get_logger().info(
+            f'tvec/rvec test node started | sub={self.image_topic} | image_qos={self.image_qos_reliability}'
+        )
 
     def _init_csv(self):
         # 使用时间戳创建 CSV，避免覆盖历史实验数据。

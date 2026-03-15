@@ -1381,3 +1381,11 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### 工作空间整理
 - 2026-03-15：删除目录 `src/track_with_land_v2`。
+
+## 问题记录（本轮补充）
+- 2026-03-15 | 问题：提交本地 Git 并上传到远程仓库。
+  解答：已完成。本地变更已提交到 `rasip_pi` 分支并推送到 `origin/rasip_pi`。
+
+## 修改记录（本轮补充）
+### Git 仓库与远程
+- 2026-03-15：执行本地提交并推送 `rasip_pi` 分支到远程。

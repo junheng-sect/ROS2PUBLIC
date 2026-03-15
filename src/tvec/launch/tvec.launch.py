@@ -39,6 +39,7 @@ def _launch_setup(context, *args, **kwargs):
         output='screen',
         parameters=[{
             'image_topic': ros_image_topic,
+            'image_qos_reliability': LaunchConfiguration('image_qos_reliability'),
             # 默认实机 USB 摄像头内参（来自 ost.yaml）。
             'camera_fx': 810.78076,
             'camera_fy': 813.75141,
@@ -81,7 +82,8 @@ def generate_launch_description():
         DeclareLaunchArgument('image_width', default_value='640'),
         DeclareLaunchArgument('image_height', default_value='480'),
         DeclareLaunchArgument('pixel_format', default_value='mjpeg2rgb'),
-        DeclareLaunchArgument('framerate', default_value='15.0'),
+        DeclareLaunchArgument('framerate', default_value='30.0'),
+        DeclareLaunchArgument('image_qos_reliability', default_value='reliable'),
         DeclareLaunchArgument('use_rqt', default_value='true'),
         OpaqueFunction(function=_launch_setup),
     ])

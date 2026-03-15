@@ -35,13 +35,13 @@
 
 ## 启动命令
 
-仿真默认示例：
+实机默认示例（默认串口与 `mavros px4.launch` 保持一致）：
 
 ```bash
 ros2 launch mavros_profiles workspace_minimal_px4.launch.py
 ```
 
-实机串口示例：
+若串口不是 `/dev/ttyS0:921600`，可手动覆盖：
 
 ```bash
 ros2 launch mavros_profiles workspace_minimal_px4.launch.py \

@@ -476,3 +476,16 @@
 ## 修改记录（本轮补充）
 ### 诊断记录
 - 2026-03-15：树莓派侧完成 CSV 指标计算与丢码段统计：`offboard_rows=4109`、`eval_rows=2894`、`fresh_ratio≈0.704`、`max_stale≈10.97s`。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：将 `land_with_tracking_v2` 和 `yaw_then_xy_tracking` 部署到树莓派并完成构建。
+  解答：已完成。两包已同步到树莓派工作空间并构建通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2 / yaw_then_xy_tracking
+- 2026-03-16：树莓派接收同步目录：
+  1) `~/project/rasip_pi_ws/src/land_with_tracking_v2`
+  2) `~/project/rasip_pi_ws/src/yaw_then_xy_tracking`
+- 2026-03-16：树莓派执行 `colcon build --packages-select land_with_tracking_v2 yaw_then_xy_tracking --symlink-install` 通过。
+- 2026-03-16：树莓派执行 `source install/setup.bash` 完成环境更新。

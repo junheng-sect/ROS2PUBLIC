@@ -1389,3 +1389,36 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### Git 仓库与远程
 - 2026-03-15：执行本地提交并推送 `rasip_pi` 分支到远程。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：对历史所有有效 CSV（有效 OFFBOARD 数据）按“OFFBOARD 最后 5 秒”重算 RMSE/P95 等指标，并输出到新建 `final5s.csv`，避免初始状态差异影响。
+  解答：已完成。已在桌面 `trackingcsv` 目录递归扫描历史 CSV（排除 summary），按每个 run 的 OFFBOARD 末 5 秒窗口重算指标并生成 `final5s.csv`。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-16：生成汇总文件 `/home/zjh/桌面/trackingcsv/final5s.csv`。
+- 2026-03-16：统计口径：每个 CSV 仅使用 `mode=OFFBOARD` 的最后 5 秒；在该窗口内按 `aruco_fresh=1` 取有效样本，计算 `rmse_x/y/z/yaw/xy`、`p95_*`、`fresh_ratio`、`max_stale_s`、`cmd_jitter_*`。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：从 `simple` 部署 `land_with_tracking_v2` 与 `yaw_then_xy_tracking` 到 laptop/树莓派，并改 USB 图像话题、禁用 RViz/RQT。
+  解答：已完成。更新本地 `origin/simple` 到最新后检出两包并完成 launch 改造：默认 `ros_image_topic=/image_raw`，`use_rqt=false`；本地构建与启动验证通过，树莓派同步构建通过。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-16：从 `origin/simple` 检出 `src/land_with_tracking_v2`。
+- 2026-03-16：更新 `launch/land_with_tracking_v2.launch.py`：新增并透传 `use_rqt`，默认 `false`；`ros_image_topic` 默认改为 `/image_raw`。
+- 2026-03-16：本地执行 `colcon build --packages-select land_with_tracking_v2 --symlink-install` 并 `timeout 18s ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py` 验证通过（未拉起 rqt/rviz）。
+
+#### yaw_then_xy_tracking
+- 2026-03-16：从 `origin/simple` 检出 `src/yaw_then_xy_tracking`。
+- 2026-03-16：更新 `launch/yaw_then_xy_tracking.launch.py`：`ros_image_topic` 默认改为 `/image_raw`，保持 `use_rqt=false`。
+- 2026-03-16：本地执行 `colcon build --packages-select yaw_then_xy_tracking --symlink-install` 并 `timeout 18s ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py` 验证通过（未拉起 rqt/rviz）。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：将桌面 `trackingcsv` 移动到工作空间并上传远程仓库。
+  解答：已完成。目录已从 `/home/zjh/桌面/trackingcsv` 移动到 `/home/zjh/project/rasip_pi_ws/trackingcsv`，并完成 Git 提交与远程推送。
+
+## 修改记录（本轮补充）
+### 工作空间整理
+- 2026-03-16：移动目录 `/home/zjh/桌面/trackingcsv` -> `/home/zjh/project/rasip_pi_ws/trackingcsv`。

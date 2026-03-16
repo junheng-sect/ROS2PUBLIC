@@ -1093,6 +1093,19 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 - 2026-03-15 00:11:14 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
 
 ## 问题记录（本轮补充）
+- 2026-03-16 10:14:15 CST | 问题：阅读当前分支以及其他分支的 `LOG` 文件，总结 `3.10-3.16` 的项目进展，用于组会汇报。
+  解答：已完成。汇总范围覆盖当前 `simple` 分支的 `LOG.md`、`questions/LOG.md` 以及 `origin/rasip_pi:LOG.md`；`origin/main` 未发现对应 `LOG.md`。本阶段进展可归纳为三条主线：1）地面效应补偿与 ArUco 精降研究方案成型，包括计划书、评价指标、基线降落策略和实机实验设计；2）视觉跟踪与降落功能包迭代，包括 `land_with_tracking`、`body_frame_tracking`、两个 minimal 包、CSV 记录和最小 MAVROS 启动配置；3）树莓派实机链路优化，包括 USB 相机链路替换、`pid_tuning` 升级、30FPS/QoS 修复、实机数据分析与双端部署验证。
+
+## 问题记录（本轮补充）
+- 2026-03-16 11:00:54 CST | 问题：PID 中控制量里的 `I` 项是怎么累计的？超过积分限幅后还会继续累计吗？
+  解答：积分项本质上是误差随时间的累加，离散实现常见为 `integral += error * dt`，再乘 `ki` 得到 `I` 项。若设置了积分限幅，常见实现是将积分状态直接夹在上下限内，或在输出饱和时启用 anti-windup 暂停同方向继续积分，因此通常不会在超过积分限幅后还无限累计；否则会导致明显积分饱和。
+
+## 修改记录（本轮补充）
+### 文档与日志
+- 2026-03-16 10:14:15 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+- 2026-03-16 11:00:54 CST：按“每轮对话都记录”规则，同步更新 `questions/LOG.md` 与本文件。
+
+## 问题记录（本轮补充）
 - 2026-03-12 | 问题：把“记录调节 tracking 的关键数据并导出 CSV”的功能加入两个 minimal 功能包。
   解答：已完成：在 `aruco_tracking_minimal` 和 `body_frame_tracking_minimal` 中分别新增 CSV 记录节点，并默认由各自 launch 拉起；可按参数配置目录、前缀和采样率，运行后自动生成 CSV 文件。
 

@@ -259,3 +259,13 @@
 
 - 问题：帮我把这条分支整理干净。
 - 解答：已完成本地 `simple` 分支清理。处理方式是将分支软重置到 `origin/simple`，保留实际文件改动，再重新提交一次，从而彻底移除原先包含 `gitpat.md` 的待推送历史。清理后，`origin/simple..simple` 之间只剩一个新的本地提交 `9997748 feat: add workspace MAVROS minimal profiles and docs`，工作区已恢复干净；同时对最新提交执行了关键字检索，未再发现 `github_pat` / `ghp_` 等 PAT 痕迹。注意：原 PAT 已属于泄露状态，仍建议立即在 GitHub 上撤销并重新生成。
+
+## 2026-03-16 10:14:15 CST
+
+- 问题：阅读当前分支以及其他分支的 `LOG` 文件，总结 `3.10-3.16` 的项目进展，用于组会汇报。
+- 解答：已完成梳理。综合当前 `simple` 分支日志、`questions/LOG.md` 以及 `origin/rasip_pi:LOG.md`，确认 `3.10-3.16` 的项目进展主要集中在三条主线：一是建立地面效应补偿与 ArUco 精降评价体系，形成计划书、基线策略、评价指标和实机实验方案；二是完成 `land_with_tracking`、`body_frame_tracking`、`aruco_tracking_minimal/body_frame_tracking_minimal`、`mavros_profiles` 等功能包迭代，实现机体系跟踪、最小链路、CSV 记录和最小 MAVROS 插件集；三是树莓派实机链路持续优化，包括 USB 相机替代仿真图像源、PID 调参工具 `pid_tuning` 升级、30FPS/图像 QoS 修复、数据归档分析、树莓派与 laptop 双端同步及多轮实机参数验证。`origin/main` 未发现对应 `LOG.md`，因此本次汇总主要依据 `simple` 与 `rasip_pi` 两条有效日志线索。
+
+## 2026-03-16 11:00:54 CST
+
+- 问题：PID 中控制量里的 `I` 项是怎么累计的？超过积分限幅后还会继续累计吗？
+- 解答：PID 的积分项本质上是误差对时间的累加，离散实现里常见形式为 `integral = integral + error * dt`，最后 `I = ki * integral`。如果控制器设置了积分限幅，常见实现有两种：一是“积分状态直接截断”，即累计到上限/下限后就夹在该范围内，不再继续无限变大；二是“抗积分饱和（anti-windup）”，当输出已饱和或积分已到极限时，暂停继续朝同方向积分，必要时只允许反向释放。工程上通常不会让它在超过积分限幅后还无限累计，否则会导致严重积分饱和。你当前项目里的控制器如果设置了 `i_limit` 或类似参数，通常就意味着积分状态会被限制在该范围内，而不是无穷增加。

@@ -1422,3 +1422,73 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
 ## 修改记录（本轮补充）
 ### 工作空间整理
 - 2026-03-16：移动目录 `/home/zjh/桌面/trackingcsv` -> `/home/zjh/project/rasip_pi_ws/trackingcsv`。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：`yaw_then_xy_tracking` 是否像 `pid_tuning` 一样记录 CSV。
+  解答：当前不记录。包内没有 CSV logger 节点，也没有文件写入逻辑。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-16：检查 `src/yaw_then_xy_tracking` 源码，确认无 CSV 导出实现。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：为 `yaw_then_xy_tracking` 增加与 `pid_tuning` 同风格的 CSV 记录与 summary 输出，但指标仅按 OFFBOARD 最后 5 秒计算。
+  解答：已完成。新增 `yaw_then_xy_tracking_csv_logger_node`，默认随 launch 启动并写入运行 CSV 与 summary；summary 统计口径已改为“OFFBOARD 最后 5 秒 + aruco_fresh=1”。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### yaw_then_xy_tracking
+- 2026-03-16：新增文件 `src/yaw_then_xy_tracking/yaw_then_xy_tracking/yaw_then_xy_tracking_csv_logger_node.py`，功能对齐 `pid_tuning` CSV logger。
+- 2026-03-16：在 logger 中新增参数 `metric_window_sec`（默认 `5.0`），并将指标统计改为仅使用 OFFBOARD 最后 5 秒窗口。
+- 2026-03-16：更新 `launch/yaw_then_xy_tracking.launch.py`，新增 `enable_csv_logger/csv_output_dir/csv_prefix/csv_sample_rate_hz/csv_stale_timeout_sec/summary_csv_path` 参数，并接入 `yaw_then_xy_tracking_csv_logger_node`。
+- 2026-03-16：更新 `setup.py`，新增可执行入口 `yaw_then_xy_tracking_csv_logger_node`。
+- 2026-03-16：更新 `package.xml`，补充 `geometry_msgs` 依赖（CSV logger 订阅本地位姿）。
+- 2026-03-16：更新 `README.md`，补充 CSV/summary 使用说明与“OFFBOARD 最后 5 秒”统计口径。
+- 2026-03-16：执行 `colcon build --packages-select yaw_then_xy_tracking --symlink-install` 并 `source install/setup.bash`。
+- 2026-03-16：执行 `timeout 18s ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py use_rqt:=false enable_csv_logger:=true` 启动验证通过，日志确认 CSV logger 节点成功拉起并生成：
+  1) `log/tracking_csv/yaw_then_xy_tracking_*.csv`
+  2) `log/tracking_csv/yaw_then_xy_tracking_summary.csv`
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：将 `land_with_tracking_v2` 的默认 PID/限幅/死区参数替换为指定的一套参数。
+  解答：已完成。默认参数已调整为：`kp_x/y=0.6`、`ki_x/y=0.0`、`kd_x/y=0.03`、`kp_yaw=0.60`、`ki_yaw=0.0`、`kd_yaw=0.03`、`kp_z=0.60`、`ki_z=0.0`、`kd_z=0.03`、`target_z=2.5`、`vx_limit=1.0`、`vy_limit=1.0`、`velocity_deadband=0.03`、`yaw_rate_deadband=0.03`。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-16：更新 `src/land_with_tracking_v2/land_with_tracking_v2/land_with_tracking_v2_node.py` 默认参数：`kd_x/kd_y/kd_yaw/kd_z` 分别由 `0.02/0.02/0.02/0.06` 调整为 `0.03/0.03/0.03/0.03`。
+- 2026-03-16：在节点中新增并启用 `target_z` 参数入口（与 `pid_tuning` 命名保持一致），用于设置跟踪目标高度。
+- 2026-03-16：更新 `src/land_with_tracking_v2/launch/land_with_tracking_v2.launch.py` 默认参数，同步上述 PID 改动，并新增 `target_z: 2.5`。
+- 2026-03-16：更新 `src/land_with_tracking_v2/README.md`，默认参数说明改为本轮目标值。
+- 2026-03-16：执行 `colcon build --packages-select land_with_tracking_v2 --symlink-install` 并 `source install/setup.bash`。
+- 2026-03-16：执行 `timeout 18s ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py use_rqt:=false` 启动自检通过（节点正常拉起，无异常退出）。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：`land_with_tracking_v2` 启动后无 ArUco 数据（`tvec_tf_node` 持续“尚未收到 /debug/tvec 数据”），要求修复。
+  解答：已修复。将图像订阅 QoS 默认改为 `best_effort` 并打通参数透传，同时新增 `aruco_dictionary` 参数用于码本切换。树莓派实测同命令下已恢复连续 `aruco_pose` 输出。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### tvec
+- 2026-03-16：`tvec_rvec_node.py` 图像订阅 QoS 默认值由 `reliable` 调整为 `best_effort`，降低与 `usb_cam` QoS 不匹配风险。
+- 2026-03-16：`tvec_rvec_node.py` 新增参数 `aruco_dictionary`（默认 `DICT_5X5_1000`），支持多字典切换，并在启动日志打印当前字典。
+- 2026-03-16：`tvec.launch.py` 新增 `aruco_dictionary` launch 参数并透传给 `tvec_rvec_node`；`image_qos_reliability` 默认改为 `best_effort`。
+
+#### tvec_tf
+- 2026-03-16：`tvec_tf.launch.py` 新增并透传 `image_qos_reliability`、`aruco_dictionary` 到 `tvec.launch.py`。
+
+#### land_with_tracking_v2
+- 2026-03-16：`land_with_tracking_v2.launch.py` 新增并透传 `image_qos_reliability`、`aruco_dictionary` 到 `tvec_tf.launch.py`。
+- 2026-03-16：`README.md` 补充“无 `/debug/tvec` 时可切换 `aruco_dictionary`”示例。
+- 2026-03-16：本地执行 `colcon build --packages-select tvec tvec_tf land_with_tracking_v2 --symlink-install` 并验证启动通过。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：将树莓派 `tracking_csv` 中的 `3.16` 文件夹和 `yaw_then_xy_tracking_summary.csv` 复制到本工作空间 `trackingcsv`。
+  解答：已完成复制并校验落盘。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-16：执行跨设备复制：
+  1) `scp -r zjh@10.250.57.110:/home/zjh/project/rasip_pi_ws/log/tracking_csv/3.16 /home/zjh/project/rasip_pi_ws/trackingcsv/`
+  2) `scp zjh@10.250.57.110:/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_summary.csv /home/zjh/project/rasip_pi_ws/trackingcsv/`
+- 2026-03-16：校验结果：`/home/zjh/project/rasip_pi_ws/trackingcsv/3.16` 与 `/home/zjh/project/rasip_pi_ws/trackingcsv/yaw_then_xy_tracking_summary.csv` 均存在。

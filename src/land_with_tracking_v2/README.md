@@ -12,11 +12,11 @@
 
 ## 默认 PID 参数（按需求）
 
-- `kp_x:=0.6 ki_x:=0.0 kd_x:=0.02`
-- `kp_y:=0.6 ki_y:=0.0 kd_y:=0.02`
-- `kp_yaw:=0.60 ki_yaw:=0.0 kd_yaw:=0.02`
-- `kp_z:=0.60 ki_z:=0.0 kd_z:=0.06`
-- `track_target_z:=2.5`
+- `kp_x:=0.6 ki_x:=0.0 kd_x:=0.03`
+- `kp_y:=0.6 ki_y:=0.0 kd_y:=0.03`
+- `kp_yaw:=0.60 ki_yaw:=0.0 kd_yaw:=0.03`
+- `kp_z:=0.60 ki_z:=0.0 kd_z:=0.03`
+- `target_z:=2.5`
 - `vx_limit:=1.0 vy_limit:=1.0`
 - `velocity_deadband:=0.03 yaw_rate_deadband:=0.03`
 
@@ -40,4 +40,10 @@
 
 ```bash
 ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py
+```
+
+若始终没有 `/debug/tvec` 数据，可尝试切换 ArUco 字典（需与实物码本一致）：
+
+```bash
+ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py aruco_dictionary:=DICT_4X4_50
 ```

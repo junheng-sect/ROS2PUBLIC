@@ -35,6 +35,7 @@ setup(
     entry_points={
         'console_scripts': [
             'yaw_then_xy_tracking_node = yaw_then_xy_tracking.yaw_then_xy_tracking_node:main',
+            'yaw_then_xy_tracking_csv_logger_node = yaw_then_xy_tracking.yaw_then_xy_tracking_csv_logger_node:main',
         ],
     },
 )

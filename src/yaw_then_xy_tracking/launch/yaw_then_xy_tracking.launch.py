@@ -2,6 +2,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -21,6 +22,12 @@ def generate_launch_description():
     framerate = LaunchConfiguration('framerate')
     annotated_image_topic = LaunchConfiguration('annotated_image_topic')
     image_qos_reliability = LaunchConfiguration('image_qos_reliability')
+    enable_csv_logger = LaunchConfiguration('enable_csv_logger')
+    csv_output_dir = LaunchConfiguration('csv_output_dir')
+    csv_prefix = LaunchConfiguration('csv_prefix')
+    csv_sample_rate_hz = LaunchConfiguration('csv_sample_rate_hz')
+    csv_stale_timeout_sec = LaunchConfiguration('csv_stale_timeout_sec')
+    summary_csv_path = LaunchConfiguration('summary_csv_path')
 
     node = Node(
         package='yaw_then_xy_tracking',
@@ -88,6 +95,40 @@ def generate_launch_description():
         }],
     )
 
+    csv_logger_node = Node(
+        package='yaw_then_xy_tracking',
+        executable='yaw_then_xy_tracking_csv_logger_node',
+        name='yaw_then_xy_tracking_csv_logger_node',
+        output='screen',
+        condition=IfCondition(enable_csv_logger),
+        parameters=[{
+            'pose_topic': '/debug/aruco_pose',
+            'state_topic': '/mavros/state',
+            'local_pose_topic': '/mavros/local_position/pose',
+            'setpoint_raw_topic': '/mavros/setpoint_raw/local',
+            'output_dir': csv_output_dir,
+            'file_prefix': csv_prefix,
+            'summary_csv_path': summary_csv_path,
+            'sample_rate_hz': csv_sample_rate_hz,
+            'stale_timeout_sec': csv_stale_timeout_sec,
+            'metric_window_sec': 5.0,
+            # 参数快照（summary 将记录这些值）
+            'target_x': 0.0,
+            'target_y': 0.0,
+            'target_yaw': 0.0,
+            'target_z': 2.5,
+            'kp_x': 0.6, 'ki_x': 0.0, 'kd_x': 0.02,
+            'kp_y': 0.6, 'ki_y': 0.0, 'kd_y': 0.02,
+            'kp_yaw': 0.60, 'ki_yaw': 0.0, 'kd_yaw': 0.02,
+            'kp_z': 0.60, 'ki_z': 0.0, 'kd_z': 0.06,
+            'vxy_limit': 1.0,
+            'vz_limit': 0.5,
+            'wz_limit': 1.0,
+            'velocity_deadband': 0.03,
+            'yaw_rate_deadband': 0.03,
+        }],
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument('world_name', default_value='rover'),
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
@@ -101,7 +142,17 @@ def generate_launch_description():
         DeclareLaunchArgument('pixel_format', default_value='mjpeg2rgb'),
         DeclareLaunchArgument('framerate', default_value='30.0'),
         DeclareLaunchArgument('image_qos_reliability', default_value='reliable'),
+        DeclareLaunchArgument('enable_csv_logger', default_value='true'),
+        DeclareLaunchArgument('csv_output_dir', default_value='/home/zjh/project/rasip_pi_ws/log/tracking_csv'),
+        DeclareLaunchArgument('csv_prefix', default_value='yaw_then_xy_tracking'),
+        DeclareLaunchArgument('csv_sample_rate_hz', default_value='30.0'),
+        DeclareLaunchArgument('csv_stale_timeout_sec', default_value='0.5'),
+        DeclareLaunchArgument(
+            'summary_csv_path',
+            default_value='/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_summary.csv',
+        ),
         tvec_launch,
         tvec_tf_node,
         node,
+        csv_logger_node,
     ])

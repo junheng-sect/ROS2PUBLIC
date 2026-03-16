@@ -38,3 +38,16 @@ ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py \
   vx_limit:=1.0 vy_limit:=1.0 \
   velocity_deadband:=0.03 yaw_rate_deadband:=0.03
 ```
+
+## CSV 记录与 Summary
+
+- 已内置 `yaw_then_xy_tracking_csv_logger_node`，默认随 launch 启动（`enable_csv_logger:=true`）。
+- 运行明细 CSV 默认输出到：`/home/zjh/project/rasip_pi_ws/log/tracking_csv/`
+- Summary 默认输出到：`/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_summary.csv`
+- 指标口径：仅使用 `OFFBOARD` **最后 5 秒**且 `aruco_fresh=1` 的样本计算 `RMSE/P95/CmdJitter`，避免初始状态差异影响稳定态精度比较。
+
+关闭 CSV 记录：
+
+```bash
+ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py enable_csv_logger:=false
+```

@@ -82,6 +82,8 @@ class LandWithTrackingV2Node(Node):
         self.declare_parameter('track_target_y', 0.0)
         self.declare_parameter('track_target_yaw', 0.0)
         self.declare_parameter('track_target_z', 2.5)
+        # 与 pid_tuning 参数名对齐，便于直接复用同一套调参命令。
+        self.declare_parameter('target_z', 2.5)
 
         # ===== 对齐阈值 =====
         self.declare_parameter('xy_align_tolerance_m', 0.10)
@@ -93,16 +95,16 @@ class LandWithTrackingV2Node(Node):
         # ===== PID 参数（按需求默认值） =====
         self.declare_parameter('kp_x', 0.6)
         self.declare_parameter('ki_x', 0.0)
-        self.declare_parameter('kd_x', 0.02)
+        self.declare_parameter('kd_x', 0.03)
         self.declare_parameter('kp_y', 0.6)
         self.declare_parameter('ki_y', 0.0)
-        self.declare_parameter('kd_y', 0.02)
+        self.declare_parameter('kd_y', 0.03)
         self.declare_parameter('kp_yaw', 0.60)
         self.declare_parameter('ki_yaw', 0.0)
-        self.declare_parameter('kd_yaw', 0.02)
+        self.declare_parameter('kd_yaw', 0.03)
         self.declare_parameter('kp_z', 0.60)
         self.declare_parameter('ki_z', 0.0)
-        self.declare_parameter('kd_z', 0.06)
+        self.declare_parameter('kd_z', 0.03)
 
         # ===== 速度限制与死区 =====
         self.declare_parameter('vx_limit', 1.0)
@@ -143,7 +145,8 @@ class LandWithTrackingV2Node(Node):
         self.track_target_x = float(self.get_parameter('track_target_x').value)
         self.track_target_y = float(self.get_parameter('track_target_y').value)
         self.track_target_yaw = float(self.get_parameter('track_target_yaw').value)
-        self.track_target_z = float(self.get_parameter('track_target_z').value)
+        # 优先使用 target_z（与 pid_tuning 同名）；未覆写时与默认 2.5 一致。
+        self.track_target_z = float(self.get_parameter('target_z').value)
 
         self.xy_align_tolerance_m = float(self.get_parameter('xy_align_tolerance_m').value)
         self.z_align_tolerance_m = float(self.get_parameter('z_align_tolerance_m').value)

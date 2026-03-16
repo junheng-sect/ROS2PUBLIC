@@ -13,6 +13,8 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
     use_rqt = LaunchConfiguration('use_rqt')
+    image_qos_reliability = LaunchConfiguration('image_qos_reliability')
+    aruco_dictionary = LaunchConfiguration('aruco_dictionary')
 
     # 默认包含视觉链路，保证一键启动即可执行流程。
     tvec_tf_launch = IncludeLaunchDescription(
@@ -21,6 +23,8 @@ def generate_launch_description():
             'world_name': world_name,
             'model_name': model_name,
             'ros_image_topic': ros_image_topic,
+            'image_qos_reliability': image_qos_reliability,
+            'aruco_dictionary': aruco_dictionary,
             'use_rqt': use_rqt,
         }.items(),
     )
@@ -32,6 +36,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'track_target_z': 2.5,
+            'target_z': 2.5,
             'xy_align_tolerance_m': 0.10,
             'z_align_tolerance_m': 0.10,
             'yaw_align_tolerance_deg': 5.0,
@@ -39,16 +44,16 @@ def generate_launch_description():
             'hover_after_align_sec': 1.0,
             'kp_x': 0.6,
             'ki_x': 0.0,
-            'kd_x': 0.02,
+            'kd_x': 0.03,
             'kp_y': 0.6,
             'ki_y': 0.0,
-            'kd_y': 0.02,
+            'kd_y': 0.03,
             'kp_yaw': 0.60,
             'ki_yaw': 0.0,
-            'kd_yaw': 0.02,
+            'kd_yaw': 0.03,
             'kp_z': 0.60,
             'ki_z': 0.0,
-            'kd_z': 0.06,
+            'kd_z': 0.03,
             'vx_limit': 1.0,
             'vy_limit': 1.0,
             'velocity_deadband': 0.03,
@@ -64,6 +69,8 @@ def generate_launch_description():
         DeclareLaunchArgument('world_name', default_value='rover'),
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
         DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
+        DeclareLaunchArgument('image_qos_reliability', default_value='best_effort'),
+        DeclareLaunchArgument('aruco_dictionary', default_value='DICT_5X5_1000'),
         DeclareLaunchArgument('use_rqt', default_value='false'),
         tvec_tf_launch,
         node,

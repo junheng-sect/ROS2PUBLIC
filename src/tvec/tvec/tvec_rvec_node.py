@@ -38,7 +38,10 @@ class TVecRVecNode(Node):
         self.declare_parameter('dist_k3', 0.0)
         self.declare_parameter('marker_size_33', 0.193)
         self.declare_parameter('marker_size_42', 0.025)
-        self.declare_parameter('image_qos_reliability', 'reliable')
+        # ArUco 字典参数，支持在 launch 中快速切换不同码本。
+        self.declare_parameter('aruco_dictionary', 'DICT_5X5_1000')
+        # 图像订阅 QoS 默认使用 best_effort，以兼容 usb_cam 的常见发布配置。
+        self.declare_parameter('image_qos_reliability', 'best_effort')
         self.declare_parameter('enable_csv_log', True)
         self.declare_parameter(
             'csv_log_path',
@@ -57,6 +60,7 @@ class TVecRVecNode(Node):
         self.k3 = float(self.get_parameter('dist_k3').value)
         self.marker_size_33 = float(self.get_parameter('marker_size_33').value)
         self.marker_size_42 = float(self.get_parameter('marker_size_42').value)
+        self.aruco_dictionary_name = str(self.get_parameter('aruco_dictionary').value).strip()
         self.image_qos_reliability = str(self.get_parameter('image_qos_reliability').value).strip().lower()
         self.enable_csv_log = bool(self.get_parameter('enable_csv_log').value)
         self.csv_path = self.get_parameter('csv_log_path').value
@@ -80,7 +84,33 @@ class TVecRVecNode(Node):
         # ArUco 检测接口兼容处理：
         # - 新版 OpenCV：cv2.aruco.ArucoDetector（OpenCV >= 4.7）。
         # - 旧版回退：cv2.aruco.detectMarkers。
-        self.dictionary = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)
+        # 支持通过参数切换常见 ArUco 字典，避免“能收图但始终不识别”的情况。
+        aruco_dict_map = {
+            'DICT_4X4_50': aruco.DICT_4X4_50,
+            'DICT_4X4_100': aruco.DICT_4X4_100,
+            'DICT_4X4_250': aruco.DICT_4X4_250,
+            'DICT_4X4_1000': aruco.DICT_4X4_1000,
+            'DICT_5X5_50': aruco.DICT_5X5_50,
+            'DICT_5X5_100': aruco.DICT_5X5_100,
+            'DICT_5X5_250': aruco.DICT_5X5_250,
+            'DICT_5X5_1000': aruco.DICT_5X5_1000,
+            'DICT_6X6_50': aruco.DICT_6X6_50,
+            'DICT_6X6_100': aruco.DICT_6X6_100,
+            'DICT_6X6_250': aruco.DICT_6X6_250,
+            'DICT_6X6_1000': aruco.DICT_6X6_1000,
+            'DICT_7X7_50': aruco.DICT_7X7_50,
+            'DICT_7X7_100': aruco.DICT_7X7_100,
+            'DICT_7X7_250': aruco.DICT_7X7_250,
+            'DICT_7X7_1000': aruco.DICT_7X7_1000,
+            'DICT_ARUCO_ORIGINAL': aruco.DICT_ARUCO_ORIGINAL,
+        }
+        dict_key = self.aruco_dictionary_name.upper()
+        if dict_key not in aruco_dict_map:
+            self.get_logger().warn(
+                f'未知 aruco_dictionary={self.aruco_dictionary_name}，回退为 DICT_5X5_1000'
+            )
+            dict_key = 'DICT_5X5_1000'
+        self.dictionary = aruco.getPredefinedDictionary(aruco_dict_map[dict_key])
         try:
             self.detector = aruco.ArucoDetector(self.dictionary, aruco.DetectorParameters())
             self.use_new_api = True
@@ -113,7 +143,9 @@ class TVecRVecNode(Node):
 
         self.log_timer = self.create_timer(1.0, self.log_callback)
         self.get_logger().info(
-            f'tvec/rvec test node started | sub={self.image_topic} | image_qos={self.image_qos_reliability}'
+            'tvec/rvec test node started | '
+            f'sub={self.image_topic} | image_qos={self.image_qos_reliability} | '
+            f'dict={dict_key}'
         )
 
     def _init_csv(self):

@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>debug_interface</depend>
+  <depend>geometry_msgs</depend>
   <depend>mavros_msgs</depend>
   <depend>launch</depend>
   <depend>launch_ros</depend>

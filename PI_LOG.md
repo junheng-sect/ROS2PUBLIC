@@ -489,3 +489,49 @@
   2) `~/project/rasip_pi_ws/src/yaw_then_xy_tracking`
 - 2026-03-16：树莓派执行 `colcon build --packages-select land_with_tracking_v2 yaw_then_xy_tracking --symlink-install` 通过。
 - 2026-03-16：树莓派执行 `source install/setup.bash` 完成环境更新。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：将 `yaw_then_xy_tracking` 新增的 CSV/summary（OFFBOARD 最后 5 秒统计）部署到树莓派。
+  解答：已完成部署并验证通过。树莓派已构建成功、launch 启动成功，且生成运行 CSV 与 summary 文件。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### yaw_then_xy_tracking
+- 2026-03-16：通过 `scp` 同步 `src/yaw_then_xy_tracking` 到树莓派 `~/project/rasip_pi_ws/src/`。
+- 2026-03-16：树莓派执行 `colcon build --packages-select yaw_then_xy_tracking --symlink-install` 通过。
+- 2026-03-16：树莓派执行 `source install/setup.bash` 后，限时启动验证：`timeout 18s ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py use_rqt:=false`。
+- 2026-03-16：验证日志确认 `yaw_then_xy_tracking_csv_logger_node` 正常拉起，输出文件：
+  1) `/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_20260316_140433.csv`
+  2) `/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_summary.csv`
+- 2026-03-16：`yaw_then_xy_tracking_summary.csv` 已写入 `metric_window_sec=5.0` 与 `offboard_rows_total/offboard_rows_window` 字段（本次验证因未进 OFFBOARD 为 `insufficient_data`，符合预期）。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：树莓派 `ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py` 启动后无 ArUco 数据（`tvec_tf_node` 持续提示“尚未收到 /debug/tvec 数据”）。
+  解答：已修复。当前树莓派同命令下已恢复连续 `aruco_pose` 输出，视觉链路正常。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### tvec / tvec_tf / land_with_tracking_v2
+- 2026-03-16：将以下文件同步到树莓派并替换：
+  1) `src/tvec/tvec/tvec_rvec_node.py`
+  2) `src/tvec/launch/tvec.launch.py`
+  3) `src/tvec_tf/launch/tvec_tf.launch.py`
+  4) `src/land_with_tracking_v2/launch/land_with_tracking_v2.launch.py`
+  5) `src/land_with_tracking_v2/README.md`
+- 2026-03-16：树莓派执行 `colcon build --packages-select tvec tvec_tf land_with_tracking_v2 --symlink-install` 构建通过。
+- 2026-03-16：树莓派启动验证：`timeout 18s ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py use_rqt:=false`。
+- 2026-03-16：验证日志确认：
+  1) `tvec_rvec_node` 订阅参数为 `image_qos=best_effort`，字典为 `DICT_5X5_1000`
+  2) `tvec_tf_node` 持续输出 `aruco_pose | ...`
+  3) 无“/debug/tvec 持续为空”的问题。
+
+## 问题记录（本轮补充）
+- 2026-03-16 | 问题：将树莓派 `tracking_csv` 中的 `3.16` 与 `yaw_then_xy_tracking_summary.csv` 复制到 laptop 工作空间 `trackingcsv`。
+  解答：已完成复制，源文件在树莓派保留。
+
+## 修改记录（本轮补充）
+### 诊断记录
+- 2026-03-16：通过 `scp` 从树莓派导出：
+  1) `/home/zjh/project/rasip_pi_ws/log/tracking_csv/3.16`
+  2) `/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_summary.csv`
+- 2026-03-16：目标路径：`/home/zjh/project/rasip_pi_ws/trackingcsv/`。

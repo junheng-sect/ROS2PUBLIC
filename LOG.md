@@ -1492,3 +1492,59 @@ ros2 launch aruco_tracking aruco_tracking.launch.py world_name:=rover model_name
   1) `scp -r zjh@10.250.57.110:/home/zjh/project/rasip_pi_ws/log/tracking_csv/3.16 /home/zjh/project/rasip_pi_ws/trackingcsv/`
   2) `scp zjh@10.250.57.110:/home/zjh/project/rasip_pi_ws/log/tracking_csv/yaw_then_xy_tracking_summary.csv /home/zjh/project/rasip_pi_ws/trackingcsv/`
 - 2026-03-16：校验结果：`/home/zjh/project/rasip_pi_ws/trackingcsv/3.16` 与 `/home/zjh/project/rasip_pi_ws/trackingcsv/yaw_then_xy_tracking_summary.csv` 均存在。
+
+## 问题记录（本轮补充）
+- 2026-03-20 | 问题：希望在 `land_with_tracking_v2` 的 launch 命令中直接调试 `xy_align_tolerance_m`、`z_align_tolerance_m`、`yaw_align_tolerance_deg`、`descent_speed_mps`。
+  解答：已完成。上述参数已暴露为 launch 参数，可在命令行直接 `参数名:=值` 覆写。
+
+## 修改记录（本轮补充）
+### 功能包修改记录
+#### land_with_tracking_v2
+- 2026-03-20：更新 `src/land_with_tracking_v2/launch/land_with_tracking_v2.launch.py`，新增 `LaunchConfiguration` 与 `DeclareLaunchArgument`：
+  1) `xy_align_tolerance_m`
+  2) `z_align_tolerance_m`
+  3) `yaw_align_tolerance_deg`
+  4) `descent_speed_mps`
+- 2026-03-20：将 `Node(parameters=...)` 中对应参数从硬编码常量改为上述 launch 参数透传。
+- 2026-03-20：更新 `src/land_with_tracking_v2/README.md`，新增命令行覆写示例。
+- 2026-03-20：执行 `colcon build --packages-select land_with_tracking_v2 --symlink-install` 并 `source install/setup.bash`。
+- 2026-03-20：执行 `timeout 18s ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py use_rqt:=false xy_align_tolerance_m:=0.08 z_align_tolerance_m:=0.08 yaw_align_tolerance_deg:=4.0 descent_speed_mps:=0.3` 启动验证通过。
+
+## 问题记录（本轮补充）
+- 2026-04-04 | 问题：咨询 NVIDIA GeForce RTX 3060 在 Ubuntu 22.04/Linux 下适合使用哪一种开源驱动，并希望得到配置建议。
+  解答：已确认 RTX 3060 属于 Ampere 架构，适合的“开源路线”优先选择 NVIDIA 官方 Open GPU Kernel Modules（Ubuntu 中通常表现为 `nvidia-driver-xxx-open` 或 `nvidia-open`），不建议将 `nouveau` 作为 ROS 2、Gazebo、RViz、CUDA 等场景的主力驱动；安装时优先使用 `ubuntu-drivers` 选择系统推荐分支。
+
+## 问题记录（本轮补充）
+- 2026-04-04 | 问题：根据“附加驱动”界面截图，咨询 RTX 3060 Mobile/Max-Q 应选择哪一个 NVIDIA 驱动安装项。
+  解答：建议优先选择界面中被 Ubuntu 标记为 tested/recommended 的非 server 开源内核模块版本，即 `nvidia-driver-580-open`；避免选择 `-server` 分支，`470-server` 过旧，也不建议在该机型上优先选择旧分支 `535/545/570`，除非 `580-open` 安装后出现兼容性问题再回退。
+
+## 问题记录（本轮补充）
+- 2026-04-04 | 问题：希望将 Ubuntu 默认启动内核改为 `6.8.0-106-generic`，因为 `6.8.0-107-generic` 下显卡驱动和网卡驱动存在问题。
+  解答：已给出通过 GRUB 将默认启动项切换为 `Advanced options for Ubuntu > Ubuntu, with Linux 6.8.0-106-generic` 的方法，并补充了验证当前内核与防止后续自动切回新内核的可选处理建议。
+
+## 问题记录（本轮补充）
+- 2026-04-04 | 问题：询问 `/etc/default/grub` 中 `GRUB_DEFAULT=2` 是否表示默认进入 `6.8.0-106-generic`。
+  解答：结合当前截图中的 GRUB 菜单顺序判断，`GRUB_DEFAULT=2` 对应的正是第三项 `Ubuntu, with Linux 6.8.0-106-generic`，因此在该菜单顺序不变的前提下，默认会进入 `106` 内核；但如果后续安装/删除内核导致菜单顺序变化，数字索引可能失效，因此更推荐使用菜单路径字符串固定到 `106`。
+- 2026-04-04 | 问题：处理 Obsidian `obsidian-git` 提示的冲突报错，文档路径为 `/home/zjh/note/Note/conflict-files-obsidian-git.md`。
+  解答：已定位为 `/home/zjh/note/Note/中期报告/中期报告PPT思路：.md` 的 Git merge 冲突；对比后保留远端完整正文版本，清理 `conflict-files-obsidian-git.md`，并完成本地 merge 提交，Obsidian 的冲突提示已消除。
+
+## 修改记录（本轮补充）
+### 笔记仓库处理记录
+- 2026-04-04：检查 `/home/zjh/note/Note` 仓库状态，确认 `main` 正处于 merge 冲突中，唯一未合并文件为 `中期报告/中期报告PPT思路：.md`。
+- 2026-04-04：对比冲突双方内容后，保留远端完整版本并将该文件标记为已解决。
+- 2026-04-04：删除 `obsidian-git` 自动生成的 `/home/zjh/note/Note/conflict-files-obsidian-git.md` 冲突提示文件，并准备完成本地 merge 提交。
+- 2026-04-04：执行 `git -C /home/zjh/note/Note fetch origin` 以拉取远端最新版本时，确认被 GitHub 鉴权失败阻塞；同时检查到本机无可用 GitHub SSH key，`gh` 也未安装，暂无法继续自动拉取。
+
+## 问题记录（本轮补充）
+- 2026-04-04 | 问题：希望先从远程仓库拉取 Obsidian 笔记仓库 `/home/zjh/note/Note` 的最新版本。
+  解答：已执行远端拉取前检查与 `fetch`，但当前 `origin` 中配置的 GitHub PAT 已失效，`fetch` 返回“Invalid username or token”，且本机也没有可用的 GitHub SSH 登录能力，因此本轮无法完成实际拉取；当前本地仓库状态为 `main...origin/main [领先 2]`，至少在最近一次成功同步基线下并不处于“本地落后”的状态。
+- 2026-04-04 | 问题：新建一个 GitHub PAT 需要哪些权限。
+  解答：已查 GitHub 官方文档。若只是让 `/home/zjh/note/Note` 这个仓库能通过 HTTPS 执行 `git fetch/pull/push`，推荐新建 fine-grained PAT，并仅授权目标仓库 `Note`，仓库权限选择 `Contents: Read and write` 即可；如果只需要拉取不需要推送，则可降为 `Contents: Read-only`。若仍使用 classic PAT，私有仓库通常选择 `repo`，公开仓库仅拉公开内容可选 `public_repo`。只有在需要修改 `.github/workflows` 时，才再额外考虑 workflow 相关权限。
+- 2026-04-04 | 问题：需要同时支持上传和拉取 Git 仓库时，PAT 还可以增加哪些权限。
+  解答：按最小权限原则，fine-grained PAT 对单仓库执行 `fetch/pull/push` 只需 `Contents: Read and write`；如果还要推送或修改 `.github/workflows/*`，再额外增加相应 workflow 权限。classic PAT 场景下，私有仓库通常直接使用 `repo` 覆盖拉取与推送需求，不建议额外勾选无关高权限。
+- 2026-04-04 | 问题：提供新的 GitHub PAT 后，要求继续拉取 `/home/zjh/note/Note` 的远端最新版本。
+  解答：已使用新的 PAT 恢复远端鉴权，成功执行 `git fetch origin` 与 `git pull --no-rebase origin main`；拉取后本地 `main` 已完成合并，当前状态为相对 `origin/main` 领先 3 个本地提交，说明远端最新内容已同步到本地。
+
+## 修改记录（本轮补充）
+### 笔记仓库处理记录
+- 2026-04-04：为 `/home/zjh/note/Note` 更新远端鉴权后，重新执行 `fetch` 与 `pull --no-rebase origin main`，成功同步远端新增提交并生成新的本地 merge 提交。

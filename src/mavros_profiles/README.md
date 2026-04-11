@@ -18,6 +18,8 @@
 - `/mavros/local_position/velocity_local`
 - `/mavros/global_position/global`
 - `/mavros/global_position/rel_alt`
+- `/mavros/altitude`
+- `/mavros/distance_sensor/*`
 - `/mavros/home_position/home`
 - `/mavros/setpoint_velocity/cmd_vel`
 - `/mavros/setpoint_raw/local`
@@ -29,6 +31,8 @@
 - `command`
 - `local_position`
 - `global_position`
+- `altitude`
+- `distance_sensor`
 - `home_position`
 - `setpoint_velocity`
 - `setpoint_raw`

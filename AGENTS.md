@@ -1,8 +1,10 @@
 # 项目初始化说明
 nfs挂载
 mkdir -p /home/zjh/mnt/raspi_home
-sudo mount -t nfs -o vers=4 10.140.87.110:/home/zjh /home/zjh/mnt/raspi_home
+sudo mount -t nfs -o vers=4 10.251.52.110:/home/zjh /home/zjh/mnt/raspi_home
 sudo umount /home/zjh/mnt/raspi_home
+ssh
+ssh zjh@10.251.52.110
 
 ## 代理人设与技术栈
 **技术栈**：
@@ -18,12 +20,11 @@ sudo umount /home/zjh/mnt/raspi_home
 ## 协作与记录要求
 
 - `AGENTS.md` 只保存个人习惯、项目约束、环境参数与规范，不记录每轮开发日志。
-- 树莓派ssh用户名zjh，密码123，IP地址10.250.57.110
+- 树莓派ssh用户名zjh，密码123，IP地址10.251.52.110
 - 日志统一按日期记录到 Obsidian 笔记目录 `/home/zjh/note/Note/<月.日>/` 下。
 - 在树莓派中的操作记录保存至当天目录下的 `PI_LOG.md` 中，实机和仿真分开。
 - 当前默认工作空间固定为 `~/project/zjh_ws`，后续操作均以该路径为准。
 - 创建功能包在把src路径下执行ros2 pkg create！
-- 问的问题记录到当天日志 `LOG.md`/`PI_LOG.md` 的“问题记录”。
 - 每轮对话都必须记录：修改了代码写入“修改记录”，解答了问题写入“问题记录”。
 - 本机开发记录写入当天目录 `/home/zjh/note/Note/<月.日>/LOG.md`，树莓派开发记录写入当天目录 `/home/zjh/note/Note/<月.日>/PI_LOG.md`。
 - 每天一个日志文件；若当天目录或日志文件不存在，需先创建再记录。

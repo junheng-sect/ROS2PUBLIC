@@ -13,6 +13,10 @@
       - 'local_position'
       # /mavros/global_position/global、/rel_alt
       - 'global_position'
+      # /mavros/altitude
+      - 'altitude'
+      # /mavros/distance_sensor/*
+      - 'distance_sensor'
       # /mavros/home_position/home
       - 'home_position'
       # /mavros/setpoint_velocity/cmd_vel

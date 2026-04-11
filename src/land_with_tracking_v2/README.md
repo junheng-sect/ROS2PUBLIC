@@ -42,6 +42,16 @@
 ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py
 ```
 
+可在 launch 命令中直接覆写对齐阈值与下降速度：
+
+```bash
+ros2 launch land_with_tracking_v2 land_with_tracking_v2.launch.py \
+  xy_align_tolerance_m:=0.15 \
+  z_align_tolerance_m:=0.15 \
+  yaw_align_tolerance_deg:=7.0 \
+  descent_speed_mps:=0.2
+```
+
 若始终没有 `/debug/tvec` 数据，可尝试切换 ArUco 字典（需与实物码本一致）：
 
 ```bash

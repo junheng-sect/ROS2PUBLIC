@@ -30,13 +30,13 @@ ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py
 ## 典型命令（显式传参）
 
 ```bash
-ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py \
+[ros2 launch yaw_then_xy_tracking yaw_then_xy_tracking.launch.py \
   kp_x:=0.6 ki_x:=0.0 kd_x:=0.02 \
   kp_y:=0.6 ki_y:=0.0 kd_y:=0.02 \
   kp_yaw:=0.60 ki_yaw:=0.0 kd_yaw:=0.02 \
   target_z:=2.5 kp_z:=0.60 ki_z:=0.0 kd_z:=0.06 \
   vx_limit:=1.0 vy_limit:=1.0 \
-  velocity_deadband:=0.03 yaw_rate_deadband:=0.03
+  velocity_deadband:=0.03 yaw_rate_deadband:=0.03]
 ```
 
 ## CSV 记录与 Summary

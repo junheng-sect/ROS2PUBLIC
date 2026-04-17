@@ -15,11 +15,11 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPo
 from sensor_msgs.msg import Imu, Range
 
 
-class PidTuningV4CsvLoggerNode(Node):
+class PidTuningV5CsvLoggerNode(Node):
     """记录调参过程到 CSV，并在退出时输出摘要指标."""
 
     def __init__(self):
-        super().__init__('pid_tuning_v4_csv_logger_node')
+        super().__init__('pid_tuning_v5_csv_logger_node')
 
         # ===== 输入话题 =====
         self.declare_parameter('pose_topic', '/debug/aruco_pose')
@@ -32,10 +32,10 @@ class PidTuningV4CsvLoggerNode(Node):
 
         # ===== 输出路径 =====
         self.declare_parameter('output_dir', '/home/zjh/project/rasip_pi_ws/log/tracking_csv')
-        self.declare_parameter('file_prefix', 'pid_tuning_v4')
+        self.declare_parameter('file_prefix', 'pid_tuning_v5')
         self.declare_parameter(
             'summary_csv_path',
-            '/home/zjh/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v4_summary.csv',
+            '/home/zjh/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v5_summary.csv',
         )
 
         # ===== 采样参数 =====
@@ -70,6 +70,7 @@ class PidTuningV4CsvLoggerNode(Node):
         self.declare_parameter('distance_sensor_timeout_sec', 0.5)
         self.declare_parameter('require_offboard', True)
         self.declare_parameter('enable_z_hold', True)
+        self.declare_parameter('offboard_entry_ramp_sec', 0.3)
 
         self.pose_topic = self.get_parameter('pose_topic').value
         self.raw_tvec_topic = self.get_parameter('raw_tvec_topic').value
@@ -124,6 +125,9 @@ class PidTuningV4CsvLoggerNode(Node):
                 bool(self.get_parameter('require_offboard').value)
             ),
             'enable_z_hold': int(bool(self.get_parameter('enable_z_hold').value)),
+            'offboard_entry_ramp_sec': float(
+                self.get_parameter('offboard_entry_ramp_sec').value
+            ),
         }
         self.camera_yaw_compensation_rad = math.radians(
             self.param_snapshot['camera_yaw_compensation_deg']
@@ -218,6 +222,7 @@ class PidTuningV4CsvLoggerNode(Node):
             'distance_sensor_timeout_sec',
             'require_offboard',
             'enable_z_hold',
+            'offboard_entry_ramp_sec',
             'raw_tvec_x',
             'raw_tvec_y',
             'raw_tvec_z',
@@ -591,6 +596,7 @@ class PidTuningV4CsvLoggerNode(Node):
             self.param_snapshot['distance_sensor_timeout_sec'],
             self.param_snapshot['require_offboard'],
             self.param_snapshot['enable_z_hold'],
+            self.param_snapshot['offboard_entry_ramp_sec'],
             raw_tvec_x,
             raw_tvec_y,
             raw_tvec_z,
@@ -830,7 +836,7 @@ class PidTuningV4CsvLoggerNode(Node):
 
     def _print_summary(self, metrics):
         """在终端打印本次调参摘要."""
-        self.get_logger().info('===== pid_tuning_v4 调参指标汇总（OFFBOARD） =====')
+        self.get_logger().info('===== pid_tuning_v5 调参指标汇总（OFFBOARD） =====')
         self.get_logger().info(
             f"status={metrics.get('status')} | offboard_rows={metrics.get('offboard_rows')} | "
             f"eval_rows={metrics.get('eval_rows')} | z_eval_rows={metrics.get('z_eval_rows')} | "
@@ -874,7 +880,7 @@ class PidTuningV4CsvLoggerNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PidTuningV4CsvLoggerNode()
+    node = PidTuningV5CsvLoggerNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

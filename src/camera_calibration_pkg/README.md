@@ -17,6 +17,8 @@ ros2 launch camera_calibration_pkg camera_calibration.launch.py
 - `image_height`：默认 `480`
 - `framerate`：默认 `15.0`（降低标定时卡死概率）
 - `pixel_format`：默认 `mjpeg2rgb`（外接 USB 摄像头推荐）
+- `camera_name`：默认 `default_cam`（建议给不同相机/分辨率单独命名）
+- `camera_info_url`：默认 `file:///home/zjh/.ros/camera_info/default_cam.yaml`
 - `size`：默认 `7x5`
 - `square`：默认 `0.041`
 - `calib_queue_size`：默认 `1`（建议保持 1）
@@ -26,6 +28,25 @@ ros2 launch camera_calibration_pkg camera_calibration.launch.py
 
 ```bash
 ros2 launch camera_calibration_pkg camera_calibration.launch.py video_device:=/dev/video0 pixel_format:=mjpeg2rgb image_width:=640 image_height:=480 framerate:=15.0 camera_topic:=/image_raw size:=7x5 square:=0.041 calib_queue_size:=1 max_chessboard_speed:=0.5
+```
+
+若要为新摄像头的 `1920x1080` 标定单独保存文件，避免覆盖旧标定，建议先解析真实设备路径再启动：
+
+```bash
+VIDEO_DEV=$(readlink -f /dev/v4l/by-id/usb-icSpring_icspring_camera_20240307110322-video-index0)
+ros2 launch camera_calibration_pkg camera_calibration.launch.py \
+  video_device:=${VIDEO_DEV} \
+  pixel_format:=mjpeg2rgb \
+  image_width:=1920 \
+  image_height:=1080 \
+  framerate:=15.0 \
+  camera_topic:=/image_raw \
+  camera_name:=icspring_cam_1920x1080 \
+  camera_info_url:=file:///home/zjh/.ros/camera_info/icspring_cam_1920x1080.yaml \
+  size:=7x5 \
+  square:=0.041 \
+  calib_queue_size:=1 \
+  max_chessboard_speed:=0.5
 ```
 
 若设备号变化，先执行：

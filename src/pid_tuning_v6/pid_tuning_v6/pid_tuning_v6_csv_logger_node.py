@@ -15,11 +15,11 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPo
 from sensor_msgs.msg import Imu, Range
 
 
-class PidTuningV4CsvLoggerNode(Node):
+class PidTuningV6CsvLoggerNode(Node):
     """记录调参过程到 CSV，并在退出时输出摘要指标."""
 
     def __init__(self):
-        super().__init__('pid_tuning_v4_csv_logger_node')
+        super().__init__('pid_tuning_v6_csv_logger_node')
 
         # ===== 输入话题 =====
         self.declare_parameter('pose_topic', '/debug/aruco_pose')
@@ -32,10 +32,10 @@ class PidTuningV4CsvLoggerNode(Node):
 
         # ===== 输出路径 =====
         self.declare_parameter('output_dir', '/home/zjh/project/rasip_pi_ws/log/tracking_csv')
-        self.declare_parameter('file_prefix', 'pid_tuning_v4')
+        self.declare_parameter('file_prefix', 'pid_tuning_v6')
         self.declare_parameter(
             'summary_csv_path',
-            '/home/zjh/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v4_summary.csv',
+            '/home/zjh/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v6_summary.csv',
         )
 
         # ===== 采样参数 =====
@@ -60,9 +60,7 @@ class PidTuningV4CsvLoggerNode(Node):
         self.declare_parameter('ki_z', 0.0)
         self.declare_parameter('kd_z', 0.06)
         self.declare_parameter('camera_yaw_compensation_deg', 0.0)
-        self.declare_parameter('vxy_limit', 0.8)
-        self.declare_parameter('vx_limit', float('nan'))
-        self.declare_parameter('vy_limit', float('nan'))
+        self.declare_parameter('v_limit', 0.8)
         self.declare_parameter('vz_limit', 0.5)
         self.declare_parameter('velocity_deadband', 0.03)
         self.declare_parameter('control_rate_hz', 30.0)
@@ -110,9 +108,7 @@ class PidTuningV4CsvLoggerNode(Node):
             'camera_yaw_compensation_deg': float(
                 self.get_parameter('camera_yaw_compensation_deg').value
             ),
-            'vxy_limit': float(self.get_parameter('vxy_limit').value),
-            'vx_limit': float(self.get_parameter('vx_limit').value),
-            'vy_limit': float(self.get_parameter('vy_limit').value),
+            'v_limit': float(self.get_parameter('v_limit').value),
             'vz_limit': float(self.get_parameter('vz_limit').value),
             'velocity_deadband': float(
                 self.get_parameter('velocity_deadband').value
@@ -208,9 +204,7 @@ class PidTuningV4CsvLoggerNode(Node):
             'ki_z',
             'kd_z',
             'camera_yaw_compensation_deg',
-            'vxy_limit',
-            'vx_limit',
-            'vy_limit',
+            'v_limit',
             'vz_limit',
             'velocity_deadband',
             'control_rate_hz',
@@ -276,6 +270,7 @@ class PidTuningV4CsvLoggerNode(Node):
             f'distance_sensor_timeout_sec={self.distance_sensor_timeout_sec:.3f} | '
             f'camera_yaw_compensation_deg='
             f'{self.param_snapshot["camera_yaw_compensation_deg"]:.3f} | '
+            f'v_limit={self.param_snapshot["v_limit"]:.3f} | '
             'yaw 不参与控制，sp_yaw_rate 仅用于观测且应保持 0.0'
         )
 
@@ -581,9 +576,7 @@ class PidTuningV4CsvLoggerNode(Node):
             self.param_snapshot['ki_z'],
             self.param_snapshot['kd_z'],
             self.param_snapshot['camera_yaw_compensation_deg'],
-            self.param_snapshot['vxy_limit'],
-            self.param_snapshot['vx_limit'],
-            self.param_snapshot['vy_limit'],
+            self.param_snapshot['v_limit'],
             self.param_snapshot['vz_limit'],
             self.param_snapshot['velocity_deadband'],
             self.param_snapshot['control_rate_hz'],
@@ -830,7 +823,7 @@ class PidTuningV4CsvLoggerNode(Node):
 
     def _print_summary(self, metrics):
         """在终端打印本次调参摘要."""
-        self.get_logger().info('===== pid_tuning_v4 调参指标汇总（OFFBOARD） =====')
+        self.get_logger().info('===== pid_tuning_v6 调参指标汇总（OFFBOARD） =====')
         self.get_logger().info(
             f"status={metrics.get('status')} | offboard_rows={metrics.get('offboard_rows')} | "
             f"eval_rows={metrics.get('eval_rows')} | z_eval_rows={metrics.get('z_eval_rows')} | "
@@ -874,7 +867,7 @@ class PidTuningV4CsvLoggerNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PidTuningV4CsvLoggerNode()
+    node = PidTuningV6CsvLoggerNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

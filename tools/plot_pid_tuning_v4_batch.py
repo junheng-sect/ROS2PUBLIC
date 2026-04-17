@@ -775,7 +775,7 @@ def write_run_summary(
         file.write("\n".join(lines) + "\n")
 
 
-def build_overall_report(summary_rows: List[SummaryRow], output_path: str) -> None:
+def build_overall_report(summary_rows: List[SummaryRow], output_path: str, batch_name: str) -> None:
     """输出本批实验总体分析文件。"""
     rows = sorted(summary_rows, key=lambda item: item.csv_name)
     ok_rows = [row for row in rows if row.status == "ok"]
@@ -783,7 +783,7 @@ def build_overall_report(summary_rows: List[SummaryRow], output_path: str) -> No
     ranked_by_xy = sorted(ok_rows, key=lambda item: (math.isnan(item.rmse_xy), item.rmse_xy))
 
     lines = [
-        "# 4.9 pid_tuning_v4 数据分析",
+        f"# {batch_name} pid_tuning_v4 数据分析",
         "",
         f"- 总实验数：{len(rows)}",
         f"- 有效实验数（status=ok）：{len(ok_rows)}",
@@ -848,7 +848,8 @@ def main() -> None:
         write_run_summary(csv_name, run_output_dir, data, summary, velocity_vector_stats, z_compare_stats)
         print(f"generated: {run_output_dir}")
 
-    build_overall_report(summary_rows, os.path.join(args.output_dir, "analysis_summary.md"))
+    batch_name = os.path.basename(os.path.normpath(args.csv_dir))
+    build_overall_report(summary_rows, os.path.join(args.output_dir, "analysis_summary.md"), batch_name)
     print(f"generated: {os.path.join(args.output_dir, 'analysis_summary.md')}")
 
 

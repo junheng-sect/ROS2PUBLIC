@@ -16,6 +16,7 @@
 - `/mavros/extended_state`
 - `/mavros/local_position/pose`
 - `/mavros/local_position/velocity_local`
+- `/mavros/imu/data`
 - `/mavros/global_position/global`
 - `/mavros/global_position/rel_alt`
 - `/mavros/altitude`
@@ -30,6 +31,7 @@
 - `sys_*`
 - `command`
 - `local_position`
+- `imu`
 - `global_position`
 - `altitude`
 - `distance_sensor`
@@ -43,6 +45,13 @@
 
 ```bash
 ros2 launch mavros_profiles workspace_minimal_px4.launch.py
+```
+
+若希望启动时关闭 `imu` 插件，可直接使用：
+
+```bash
+ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
+  enable_imu:=false
 ```
 
 若串口不是 `/dev/ttyS0:921600`，可手动覆盖：
@@ -59,6 +68,18 @@ ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
   namespace:=uas1/mavros
 ```
 
+若你希望完全手动接管插件清单，也可以直接覆盖：
+
+```bash
+ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
+  pluginlists_yaml:=/home/zjh/project/rasip_pi_ws/src/mavros_profiles/config/workspace_minimal_pluginlists_no_imu.yaml
+```
+
+说明：
+
+- `enable_imu:=true/false` 只用于在本包自带的两份最小插件清单之间切换
+- 若同时传入 `pluginlists_yaml:=...`，则以你手动指定的 YAML 为准
+
 ## 适用范围
 
 这套最小配置已考虑当前工作空间内常见 MAVROS 使用者：
@@ -73,6 +94,7 @@ ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
 - `return_track_hover`
 - `total`
 - 以及订阅 `/mavros/local_position/pose` 的 TF/记录节点
+- 以及需要从 `/mavros/imu/data` 读取本机姿态的记录节点
 
 ## 说明
 

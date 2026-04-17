@@ -32,6 +32,7 @@ yaw_rel_corrected = wrap_to_pi(yaw_rel_raw + camera_yaw_compensation_rad)
 - 输入飞控状态：`/mavros/state`
 - 输入距离传感器：`/mavros/hrlv_ez4_pub`
 - CSV logger 额外订阅：`/mavros/local_position/pose`
+- CSV logger 姿态订阅：`/mavros/imu/data`
 - 控制输出：`/mavros/setpoint_raw/local`
 
 距离传感器消息类型沿用当前工作空间已有用法：
@@ -168,6 +169,22 @@ usb_cam(可选) -> /debug/tvec -> tvec_tf_node -> /debug/aruco_pose
 - `ez_from_vision = target_z - aruco_z`
 - `ez_from_distance_sensor = target_z - distance_sensor_z`
 
+当前单次 CSV 还会额外记录以下原始输入，供后续离线理论复算使用：
+
+- 原始视觉 `/debug/tvec` 的 `raw_tvec_x/raw_tvec_y/raw_tvec_z`
+- 原始视觉 `/debug/tvec` 的 `raw_rvec_x/raw_rvec_y/raw_rvec_z`
+- 本机姿态 `/mavros/local_position/pose` 的 `local_roll_rad/local_pitch_rad/local_yaw_rad`
+
+其中：
+
+- `local_x/local_y/local_z` 继续来自 `/mavros/local_position/pose`
+- `local_roll_rad/local_pitch_rad/local_yaw_rad` 优先来自 `/mavros/imu/data` 的四元数；若 IMU 暂不可用，则回退到 `/mavros/local_position/pose`
+
+这批补充数据主要用于：
+
+- 为后续按 `T_c_m -> T_m_c -> T_m_b` 做理论复算提供原始输入
+- 分析飞行中的 `roll/pitch` 与 ArUco 位姿大跳之间的关系
+
 默认日志路径为：
 
 - 单次 CSV 默认目录：`/home/zjh/project/rasip_pi_ws/log/tracking_csv`
@@ -223,8 +240,8 @@ ros2 launch pid_tuning_v4 pid_tuning_v4.launch.py \
 ```bash
 ros2 launch pid_tuning_v4 pid_tuning_v4.launch.py \
   use_rqt:=false \
-  target_z:=2.5 \
-  kp_xy:=1.00 kd_xy:=0.06 \
+  target_z:=0.8 \
+  kp_xy:=1.0 kd_xy:=0.06 \
   kp_z:=0.60 vz_limit:=0.40 \
   vxy_limit:=0.60 velocity_deadband:=0.02 \
   distance_sensor_timeout_sec:=0.5 \

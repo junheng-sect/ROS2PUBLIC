@@ -12,30 +12,33 @@ from geometry_msgs.msg import PoseStamped
 from mavros_msgs.msg import PositionTarget, State
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import Imu, Range
+from sensor_msgs.msg import Imu
 
 
-class PidTuningV4CsvLoggerNode(Node):
+class DynamicTrackingV2CsvLoggerNode(Node):
     """记录调参过程到 CSV，并在退出时输出摘要指标."""
 
     def __init__(self):
-        super().__init__('pid_tuning_v4_csv_logger_node')
+        super().__init__('dynamic_tracking_v2_csv_logger_node')
 
         # ===== 输入话题 =====
         self.declare_parameter('pose_topic', '/debug/aruco_pose')
         self.declare_parameter('raw_tvec_topic', '/debug/tvec')
         self.declare_parameter('state_topic', '/mavros/state')
-        self.declare_parameter('distance_sensor_topic', '/mavros/hrlv_ez4_pub')
         self.declare_parameter('local_pose_topic', '/mavros/local_position/pose')
         self.declare_parameter('attitude_topic', '/mavros/imu/data')
         self.declare_parameter('setpoint_raw_topic', '/mavros/setpoint_raw/local')
 
         # ===== 输出路径 =====
-        self.declare_parameter('output_dir', '/home/zjh/project/rasip_pi_ws/log/tracking_csv')
-        self.declare_parameter('file_prefix', 'pid_tuning_v4')
+        self.declare_parameter(
+            'output_dir',
+            '/home/zjh/project/rasip_pi_ws/log/tracking_csv',
+        )
+        self.declare_parameter('file_prefix', 'dynamic_tracking_v2')
         self.declare_parameter(
             'summary_csv_path',
-            '/home/zjh/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v4_summary.csv',
+            '/home/zjh/project/rasip_pi_ws/log/tracking_csv/'
+            'dynamic_tracking_v2_summary.csv',
         )
 
         # ===== 采样参数 =====
@@ -47,6 +50,7 @@ class PidTuningV4CsvLoggerNode(Node):
         self.declare_parameter('target_x', 0.0)
         self.declare_parameter('target_y', 0.0)
         self.declare_parameter('target_z', 2.5)
+        self.declare_parameter('target_yaw', 0.0)
         self.declare_parameter('kp_xy', 0.5)
         self.declare_parameter('ki_xy', 0.0)
         self.declare_parameter('kd_xy', 0.08)
@@ -56,25 +60,25 @@ class PidTuningV4CsvLoggerNode(Node):
         self.declare_parameter('kp_y', float('nan'))
         self.declare_parameter('ki_y', float('nan'))
         self.declare_parameter('kd_y', float('nan'))
-        self.declare_parameter('kp_z', 0.8)
+        self.declare_parameter('kp_z', 0.5)
         self.declare_parameter('ki_z', 0.0)
-        self.declare_parameter('kd_z', 0.06)
+        self.declare_parameter('kd_z', 0.03)
+        self.declare_parameter('kp_yaw', 0.4)
+        self.declare_parameter('ki_yaw', 0.0)
+        self.declare_parameter('kd_yaw', 0.03)
         self.declare_parameter('camera_yaw_compensation_deg', 0.0)
-        self.declare_parameter('vxy_limit', 0.8)
-        self.declare_parameter('vx_limit', float('nan'))
-        self.declare_parameter('vy_limit', float('nan'))
-        self.declare_parameter('vz_limit', 0.5)
+        self.declare_parameter('v_limit', 0.8)
+        self.declare_parameter('vz_limit', 0.3)
+        self.declare_parameter('yaw_rate_limit', 0.4)
         self.declare_parameter('velocity_deadband', 0.03)
         self.declare_parameter('control_rate_hz', 30.0)
         self.declare_parameter('pose_timeout_sec', 0.5)
-        self.declare_parameter('distance_sensor_timeout_sec', 0.5)
         self.declare_parameter('require_offboard', True)
         self.declare_parameter('enable_z_hold', True)
 
         self.pose_topic = self.get_parameter('pose_topic').value
         self.raw_tvec_topic = self.get_parameter('raw_tvec_topic').value
         self.state_topic = self.get_parameter('state_topic').value
-        self.distance_sensor_topic = self.get_parameter('distance_sensor_topic').value
         self.local_pose_topic = self.get_parameter('local_pose_topic').value
         self.attitude_topic = self.get_parameter('attitude_topic').value
         self.setpoint_raw_topic = self.get_parameter('setpoint_raw_topic').value
@@ -84,17 +88,16 @@ class PidTuningV4CsvLoggerNode(Node):
         self.summary_csv_path = self.get_parameter('summary_csv_path').value
         self.sample_rate_hz = float(self.get_parameter('sample_rate_hz').value)
         self.stale_timeout_sec = float(self.get_parameter('stale_timeout_sec').value)
-        self.flush_interval_sec = float(self.get_parameter('flush_interval_sec').value)
-        self.distance_sensor_timeout_sec = float(
-            self.get_parameter('distance_sensor_timeout_sec').value
+        self.flush_interval_sec = float(
+            self.get_parameter('flush_interval_sec').value
         )
 
         # 记录完整参数快照，便于后续回溯“这一条数据对应哪组参数”。
         self.param_snapshot = {
-            'distance_sensor_topic': self.distance_sensor_topic,
             'target_x': float(self.get_parameter('target_x').value),
             'target_y': float(self.get_parameter('target_y').value),
             'target_z': float(self.get_parameter('target_z').value),
+            'target_yaw': float(self.get_parameter('target_yaw').value),
             'kp_xy': float(self.get_parameter('kp_xy').value),
             'ki_xy': float(self.get_parameter('ki_xy').value),
             'kd_xy': float(self.get_parameter('kd_xy').value),
@@ -107,19 +110,22 @@ class PidTuningV4CsvLoggerNode(Node):
             'kp_z': float(self.get_parameter('kp_z').value),
             'ki_z': float(self.get_parameter('ki_z').value),
             'kd_z': float(self.get_parameter('kd_z').value),
+            'kp_yaw': float(self.get_parameter('kp_yaw').value),
+            'ki_yaw': float(self.get_parameter('ki_yaw').value),
+            'kd_yaw': float(self.get_parameter('kd_yaw').value),
             'camera_yaw_compensation_deg': float(
                 self.get_parameter('camera_yaw_compensation_deg').value
             ),
-            'vxy_limit': float(self.get_parameter('vxy_limit').value),
-            'vx_limit': float(self.get_parameter('vx_limit').value),
-            'vy_limit': float(self.get_parameter('vy_limit').value),
+            'v_limit': float(self.get_parameter('v_limit').value),
             'vz_limit': float(self.get_parameter('vz_limit').value),
+            'yaw_rate_limit': float(
+                self.get_parameter('yaw_rate_limit').value
+            ),
             'velocity_deadband': float(
                 self.get_parameter('velocity_deadband').value
             ),
             'control_rate_hz': float(self.get_parameter('control_rate_hz').value),
             'pose_timeout_sec': float(self.get_parameter('pose_timeout_sec').value),
-            'distance_sensor_timeout_sec': self.distance_sensor_timeout_sec,
             'require_offboard': int(
                 bool(self.get_parameter('require_offboard').value)
             ),
@@ -133,14 +139,12 @@ class PidTuningV4CsvLoggerNode(Node):
         self.state_msg: Optional[State] = None
         self.pose_msg: Optional[ArucoBasePose] = None
         self.raw_tvec_msg: Optional[TVecRVec] = None
-        self.distance_sensor_msg: Optional[Range] = None
         self.local_pose_msg: Optional[PoseStamped] = None
         self.attitude_msg: Optional[Imu] = None
         self.setpoint_msg: Optional[PositionTarget] = None
 
         self.pose_rx_time = None
         self.raw_tvec_rx_time = None
-        self.distance_sensor_rx_time = None
         self.local_pose_rx_time = None
         self.attitude_rx_time = None
         self.setpoint_rx_time = None
@@ -151,7 +155,10 @@ class PidTuningV4CsvLoggerNode(Node):
 
         os.makedirs(self.output_dir, exist_ok=True)
         now_text = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.csv_path = os.path.join(self.output_dir, f'{self.file_prefix}_{now_text}.csv')
+        self.csv_path = os.path.join(
+            self.output_dir,
+            f'{self.file_prefix}_{now_text}.csv',
+        )
         self.csv_file = open(self.csv_path, 'w', newline='', encoding='utf-8')
         self.csv_writer = csv.writer(self.csv_file, lineterminator='\n')
         self.csv_writer.writerow([
@@ -164,13 +171,6 @@ class PidTuningV4CsvLoggerNode(Node):
             'aruco_x',
             'aruco_y',
             'aruco_z',
-            'distance_sensor_z',
-            'distance_sensor_fresh',
-            'distance_sensor_age_sec',
-            'distance_sensor_valid',
-            'z_source_used',
-            'ez_from_vision',
-            'ez_from_distance_sensor',
             'aruco_yaw_rad',
             'yaw_rel_raw_rad',
             'yaw_rel_corrected_rad',
@@ -178,6 +178,8 @@ class PidTuningV4CsvLoggerNode(Node):
             'ey_marker',
             'ex_body',
             'ey_body',
+            'ez',
+            'eyaw',
             'local_pose_fresh',
             'local_pose_age_sec',
             'local_x',
@@ -195,6 +197,7 @@ class PidTuningV4CsvLoggerNode(Node):
             'target_x',
             'target_y',
             'target_z',
+            'target_yaw',
             'kp_xy',
             'ki_xy',
             'kd_xy',
@@ -207,15 +210,16 @@ class PidTuningV4CsvLoggerNode(Node):
             'kp_z',
             'ki_z',
             'kd_z',
+            'kp_yaw',
+            'ki_yaw',
+            'kd_yaw',
             'camera_yaw_compensation_deg',
-            'vxy_limit',
-            'vx_limit',
-            'vy_limit',
+            'v_limit',
             'vz_limit',
+            'yaw_rate_limit',
             'velocity_deadband',
             'control_rate_hz',
             'pose_timeout_sec',
-            'distance_sensor_timeout_sec',
             'require_offboard',
             'enable_z_hold',
             'raw_tvec_x',
@@ -240,12 +244,6 @@ class PidTuningV4CsvLoggerNode(Node):
         self.create_subscription(ArucoBasePose, self.pose_topic, self._on_pose, 10)
         self.create_subscription(TVecRVec, self.raw_tvec_topic, self._on_raw_tvec, 10)
         self.create_subscription(
-            Range,
-            self.distance_sensor_topic,
-            self._on_distance_sensor,
-            mavros_pose_qos,
-        )
-        self.create_subscription(
             PoseStamped,
             self.local_pose_topic,
             self._on_local_pose,
@@ -267,16 +265,19 @@ class PidTuningV4CsvLoggerNode(Node):
         timer_period = 1.0 / max(self.sample_rate_hz, 1.0)
         self.create_timer(timer_period, self._write_row)
 
-        self.get_logger().info(f'PID调参 CSV 记录已启动，输出文件: {self.csv_path}')
+        self.get_logger().info(
+            f'PID调参 CSV 记录已启动，输出文件: {self.csv_path}'
+        )
         self.get_logger().info(
             '参数快照 | '
             f'raw_tvec_topic={self.raw_tvec_topic} | '
-            f'distance_sensor_topic={self.distance_sensor_topic} | '
             f'attitude_topic={self.attitude_topic} | '
-            f'distance_sensor_timeout_sec={self.distance_sensor_timeout_sec:.3f} | '
             f'camera_yaw_compensation_deg='
             f'{self.param_snapshot["camera_yaw_compensation_deg"]:.3f} | '
-            'yaw 不参与控制，sp_yaw_rate 仅用于观测且应保持 0.0'
+            f'v_limit={self.param_snapshot["v_limit"]:.3f} | '
+            f'vz_limit={self.param_snapshot["vz_limit"]:.3f} | '
+            f'yaw_rate_limit={self.param_snapshot["yaw_rate_limit"]:.3f} | '
+            'Z 使用 aruco_z，yaw 使用 yaw_rel_corrected 闭环'
         )
 
     @staticmethod
@@ -298,11 +299,13 @@ class PidTuningV4CsvLoggerNode(Node):
         return ex_body, ey_body
 
     @staticmethod
-    def _quat_to_rpy(x: float, y: float, z: float, w: float) -> tuple[float, float, float]:
+    def _quat_to_rpy(
+        x: float,
+        y: float,
+        z: float,
+        w: float,
+    ) -> tuple[float, float, float]:
         """四元数转 roll/pitch/yaw（单位：rad）."""
-        # 这里采用 ROS 中常见的右手系欧拉角约定：
-        # 结果依次表示绕 X 轴的 roll、绕 Y 轴的 pitch、绕 Z 轴的 yaw。
-        # 该写法等价于常见的 ZYX（yaw-pitch-roll）姿态分解，便于和飞控姿态分析保持一致。
         sinr_cosp = 2.0 * (w * x + y * z)
         cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
         roll = math.atan2(sinr_cosp, cosr_cosp)
@@ -327,13 +330,6 @@ class PidTuningV4CsvLoggerNode(Node):
         """判断数据是否仍处于新鲜时间窗内."""
         return self._age_sec(stamp_time, now_time) <= timeout_sec
 
-    @staticmethod
-    def _range_is_in_bounds(range_value: float, min_range: float, max_range: float) -> bool:
-        """检查距离值是否落在消息声明的合法量程内."""
-        lower_ok = (not math.isfinite(min_range)) or (range_value >= min_range)
-        upper_ok = (not math.isfinite(max_range)) or (range_value <= max_range)
-        return lower_ok and upper_ok
-
     def _on_state(self, msg: State):
         self.state_msg = msg
 
@@ -344,10 +340,6 @@ class PidTuningV4CsvLoggerNode(Node):
     def _on_raw_tvec(self, msg: TVecRVec):
         self.raw_tvec_msg = msg
         self.raw_tvec_rx_time = self.get_clock().now()
-
-    def _on_distance_sensor(self, msg: Range):
-        self.distance_sensor_msg = msg
-        self.distance_sensor_rx_time = self.get_clock().now()
 
     def _on_local_pose(self, msg: PoseStamped):
         self.local_pose_msg = msg
@@ -369,7 +361,10 @@ class PidTuningV4CsvLoggerNode(Node):
 
         mode = self.state_msg.mode if self.state_msg is not None else ''
         armed = int(self.state_msg.armed) if self.state_msg is not None else -1
-        connected = int(self.state_msg.connected) if self.state_msg is not None else -1
+        connected = (
+            int(self.state_msg.connected)
+            if self.state_msg is not None else -1
+        )
 
         aruco_fresh = int(
             self._is_fresh(self.pose_rx_time, now_time, self.stale_timeout_sec)
@@ -380,9 +375,6 @@ class PidTuningV4CsvLoggerNode(Node):
             aruco_y = float(self.pose_msg.y)
             aruco_z = float(self.pose_msg.z)
             aruco_yaw = float(self.pose_msg.yaw)
-            # 与控制节点保持一致：
-            # `aruco_yaw_rad` 保留视觉链原始输出，
-            # `yaw_rel_raw_rad`/`yaw_rel_corrected_rad` 记录真正参与控制的 yaw。
             yaw_rel_raw = self.wrap_to_pi(-aruco_yaw)
             yaw_rel_corrected = self.wrap_to_pi(
                 yaw_rel_raw + self.camera_yaw_compensation_rad
@@ -394,7 +386,10 @@ class PidTuningV4CsvLoggerNode(Node):
                 ey_marker,
                 yaw_rel_corrected,
             )
-            ez_from_vision = self.param_snapshot['target_z'] - aruco_z
+            ez = self.param_snapshot['target_z'] - aruco_z
+            eyaw = self.wrap_to_pi(
+                self.param_snapshot['target_yaw'] - yaw_rel_corrected
+            )
         else:
             aruco_x = float('nan')
             aruco_y = float('nan')
@@ -406,7 +401,8 @@ class PidTuningV4CsvLoggerNode(Node):
             ey_marker = float('nan')
             ex_body = float('nan')
             ey_body = float('nan')
-            ez_from_vision = float('nan')
+            ez = float('nan')
+            eyaw = float('nan')
 
         if self.raw_tvec_msg is not None:
             raw_tvec_x = float(self.raw_tvec_msg.tvec[0])
@@ -422,46 +418,6 @@ class PidTuningV4CsvLoggerNode(Node):
             raw_rvec_x = float('nan')
             raw_rvec_y = float('nan')
             raw_rvec_z = float('nan')
-
-        distance_sensor_fresh = int(
-            self._is_fresh(
-                self.distance_sensor_rx_time,
-                now_time,
-                self.distance_sensor_timeout_sec,
-            )
-        )
-        distance_sensor_age = self._age_sec(self.distance_sensor_rx_time, now_time)
-        if self.distance_sensor_msg is not None:
-            distance_sensor_z = float(self.distance_sensor_msg.range)
-            min_range = float(self.distance_sensor_msg.min_range)
-            max_range = float(self.distance_sensor_msg.max_range)
-            distance_sensor_finite = math.isfinite(distance_sensor_z)
-            distance_sensor_in_range = (
-                distance_sensor_finite
-                and self._range_is_in_bounds(
-                    distance_sensor_z,
-                    min_range,
-                    max_range,
-                )
-            )
-            distance_sensor_valid = int(
-                distance_sensor_fresh and distance_sensor_in_range
-            )
-            ez_from_distance_sensor = (
-                self.param_snapshot['target_z'] - distance_sensor_z
-                if distance_sensor_finite else float('nan')
-            )
-        else:
-            distance_sensor_z = float('nan')
-            distance_sensor_valid = 0
-            ez_from_distance_sensor = float('nan')
-
-        if not self.param_snapshot['enable_z_hold']:
-            z_source_used = 'disabled'
-        elif distance_sensor_valid == 1:
-            z_source_used = 'distance_sensor'
-        else:
-            z_source_used = 'invalid'
 
         local_fresh = int(
             self._is_fresh(
@@ -481,10 +437,6 @@ class PidTuningV4CsvLoggerNode(Node):
             local_y = float('nan')
             local_z = float('nan')
 
-        # 姿态优先取 IMU 四元数。
-        # 原因：当前最小化 MAVROS 配置下，/mavros/local_position/pose 的位置是有效的，
-        # 但其 orientation 可能长期保持单位四元数，导致 roll/pitch/yaw 全部被记录成 0。
-        # 因此这里保留 local_position 的位置来源，同时优先使用 /mavros/imu/data 记录真实姿态。
         if self.attitude_msg is not None:
             attitude_orientation = self.attitude_msg.orientation
         elif self.local_pose_msg is not None:
@@ -537,13 +489,6 @@ class PidTuningV4CsvLoggerNode(Node):
             aruco_x,
             aruco_y,
             aruco_z,
-            distance_sensor_z,
-            distance_sensor_fresh,
-            distance_sensor_age,
-            distance_sensor_valid,
-            z_source_used,
-            ez_from_vision,
-            ez_from_distance_sensor,
             aruco_yaw,
             yaw_rel_raw,
             yaw_rel_corrected,
@@ -551,6 +496,8 @@ class PidTuningV4CsvLoggerNode(Node):
             ey_marker,
             ex_body,
             ey_body,
+            ez,
+            eyaw,
             local_fresh,
             local_age,
             local_x,
@@ -568,6 +515,7 @@ class PidTuningV4CsvLoggerNode(Node):
             self.param_snapshot['target_x'],
             self.param_snapshot['target_y'],
             self.param_snapshot['target_z'],
+            self.param_snapshot['target_yaw'],
             self.param_snapshot['kp_xy'],
             self.param_snapshot['ki_xy'],
             self.param_snapshot['kd_xy'],
@@ -580,15 +528,16 @@ class PidTuningV4CsvLoggerNode(Node):
             self.param_snapshot['kp_z'],
             self.param_snapshot['ki_z'],
             self.param_snapshot['kd_z'],
+            self.param_snapshot['kp_yaw'],
+            self.param_snapshot['ki_yaw'],
+            self.param_snapshot['kd_yaw'],
             self.param_snapshot['camera_yaw_compensation_deg'],
-            self.param_snapshot['vxy_limit'],
-            self.param_snapshot['vx_limit'],
-            self.param_snapshot['vy_limit'],
+            self.param_snapshot['v_limit'],
             self.param_snapshot['vz_limit'],
+            self.param_snapshot['yaw_rate_limit'],
             self.param_snapshot['velocity_deadband'],
             self.param_snapshot['control_rate_hz'],
             self.param_snapshot['pose_timeout_sec'],
-            self.param_snapshot['distance_sensor_timeout_sec'],
             self.param_snapshot['require_offboard'],
             self.param_snapshot['enable_z_hold'],
             raw_tvec_x,
@@ -601,17 +550,14 @@ class PidTuningV4CsvLoggerNode(Node):
             local_pitch,
         ])
 
-        # 指标统计仍以 OFFBOARD + aruco fresh 为主，保证 XY 与 yaw 对齐口径；
-        # Z 指标则只在距离传感器有效样本上计算。
         self.metric_rows.append({
             't': ros_time_sec,
             'mode': mode,
             'aruco_fresh': aruco_fresh,
-            'distance_sensor_valid': distance_sensor_valid,
             'aruco_x': aruco_x,
             'aruco_y': aruco_y,
             'aruco_z': aruco_z,
-            'distance_sensor_z': distance_sensor_z,
+            'eyaw': eyaw,
             'sp_vx': sp_vx,
             'sp_vy': sp_vy,
             'sp_yaw_rate': sp_yaw_rate,
@@ -647,36 +593,33 @@ class PidTuningV4CsvLoggerNode(Node):
         if len(vals) < 2:
             return 0.0
         mean_val = sum(vals) / len(vals)
-        return math.sqrt(sum((v - mean_val) * (v - mean_val) for v in vals) / len(vals))
+        return math.sqrt(
+            sum((v - mean_val) * (v - mean_val) for v in vals) / len(vals)
+        )
 
     def _compute_metrics(self):
         """计算 OFFBOARD 窗口下的调参摘要指标."""
         off_rows = [row for row in self.metric_rows if row['mode'] == 'OFFBOARD']
         eval_rows = [row for row in off_rows if row['aruco_fresh'] == 1]
-        z_eval_rows = [
-            row for row in eval_rows if row['distance_sensor_valid'] == 1
-        ]
 
         result = {
             'eval_rows': len(eval_rows),
             'offboard_rows': len(off_rows),
-            'z_eval_rows': len(z_eval_rows),
+            'z_eval_rows': len(eval_rows),
             'status': 'ok' if len(eval_rows) >= 1 else 'insufficient_data',
         }
 
         if not off_rows:
             result.update({
                 'fresh_ratio': float('nan'),
-                'distance_valid_ratio': float('nan'),
                 'max_stale_s': float('nan'),
                 'max_abs_yaw_rate': float('nan'),
+                'rmse_yaw': float('nan'),
+                'p95_abs_yaw': float('nan'),
             })
             return result
 
         fresh_ratio = len(eval_rows) / len(off_rows)
-        distance_valid_ratio = (
-            len(z_eval_rows) / len(eval_rows) if eval_rows else float('nan')
-        )
 
         stale_run = 0
         max_stale_run = 0
@@ -701,12 +644,17 @@ class PidTuningV4CsvLoggerNode(Node):
 
         result.update({
             'fresh_ratio': fresh_ratio,
-            'distance_valid_ratio': distance_valid_ratio,
             'max_stale_s': max_stale_s,
-            'max_abs_yaw_rate': max(yaw_rate_vals) if yaw_rate_vals else float('nan'),
+            'max_abs_yaw_rate': (
+                max(yaw_rate_vals) if yaw_rate_vals else float('nan')
+            ),
         })
 
         if not eval_rows:
+            result.update({
+                'rmse_yaw': float('nan'),
+                'p95_abs_yaw': float('nan'),
+            })
             return result
 
         target_x = self.param_snapshot['target_x']
@@ -715,22 +663,19 @@ class PidTuningV4CsvLoggerNode(Node):
 
         ex_marker = [target_x - row['aruco_x'] for row in eval_rows]
         ey_marker = [row['aruco_y'] - target_y for row in eval_rows]
+        ez_vals = [target_z - row['aruco_z'] for row in eval_rows]
+        eyaw_vals = [
+            row['eyaw'] for row in eval_rows if math.isfinite(row['eyaw'])
+        ]
 
         abs_ex = [abs(val) for val in ex_marker]
         abs_ey = [abs(val) for val in ey_marker]
+        abs_ez = [abs(val) for val in ez_vals]
+        abs_eyaw = [abs(val) for val in eyaw_vals]
         exy = [
             math.hypot(ex_marker[idx], ey_marker[idx])
             for idx in range(len(ex_marker))
         ]
-
-        if z_eval_rows:
-            ez = [target_z - row['distance_sensor_z'] for row in z_eval_rows]
-            abs_ez = [abs(val) for val in ez]
-            rmse_z = self._rmse(ez)
-            p95_abs_z = self._quantile(abs_ez, 0.95)
-        else:
-            rmse_z = float('nan')
-            p95_abs_z = float('nan')
 
         sp_vx = [row['sp_vx'] for row in eval_rows if math.isfinite(row['sp_vx'])]
         sp_vy = [row['sp_vy'] for row in eval_rows if math.isfinite(row['sp_vy'])]
@@ -744,12 +689,14 @@ class PidTuningV4CsvLoggerNode(Node):
         result.update({
             'rmse_x': self._rmse(ex_marker),
             'rmse_y': self._rmse(ey_marker),
-            'rmse_z': rmse_z,
+            'rmse_z': self._rmse(ez_vals),
             'rmse_xy': self._rmse(exy),
+            'rmse_yaw': self._rmse(eyaw_vals),
             'p95_abs_x': self._quantile(abs_ex, 0.95),
             'p95_abs_y': self._quantile(abs_ey, 0.95),
-            'p95_abs_z': p95_abs_z,
+            'p95_abs_z': self._quantile(abs_ez, 0.95),
             'p95_xy': self._quantile(exy, 0.95),
+            'p95_abs_yaw': self._quantile(abs_eyaw, 0.95),
             'cmd_jitter_x': cmd_jitter_x,
             'cmd_jitter_y': cmd_jitter_y,
             'cmd_jitter_xy': cmd_jitter_xy,
@@ -801,19 +748,17 @@ class PidTuningV4CsvLoggerNode(Node):
             'eval_rows': metrics.get('eval_rows', 0),
             'z_eval_rows': metrics.get('z_eval_rows', 0),
             'fresh_ratio': metrics.get('fresh_ratio', float('nan')),
-            'distance_valid_ratio': metrics.get(
-                'distance_valid_ratio',
-                float('nan'),
-            ),
             'max_stale_s': metrics.get('max_stale_s', float('nan')),
             'rmse_x': metrics.get('rmse_x', float('nan')),
             'rmse_y': metrics.get('rmse_y', float('nan')),
             'rmse_z': metrics.get('rmse_z', float('nan')),
             'rmse_xy': metrics.get('rmse_xy', float('nan')),
+            'rmse_yaw': metrics.get('rmse_yaw', float('nan')),
             'p95_abs_x': metrics.get('p95_abs_x', float('nan')),
             'p95_abs_y': metrics.get('p95_abs_y', float('nan')),
             'p95_abs_z': metrics.get('p95_abs_z', float('nan')),
             'p95_xy': metrics.get('p95_xy', float('nan')),
+            'p95_abs_yaw': metrics.get('p95_abs_yaw', float('nan')),
             'cmd_jitter_x': metrics.get('cmd_jitter_x', float('nan')),
             'cmd_jitter_y': metrics.get('cmd_jitter_y', float('nan')),
             'cmd_jitter_xy': metrics.get('cmd_jitter_xy', float('nan')),
@@ -823,33 +768,48 @@ class PidTuningV4CsvLoggerNode(Node):
 
         fieldnames = list(row.keys())
         with open(self.summary_csv_path, 'a', newline='', encoding='utf-8') as summary_file:
-            writer = csv.DictWriter(summary_file, fieldnames=fieldnames, lineterminator='\n')
+            writer = csv.DictWriter(
+                summary_file,
+                fieldnames=fieldnames,
+                lineterminator='\n',
+            )
             if not file_exists:
                 writer.writeheader()
             writer.writerow(row)
 
     def _print_summary(self, metrics):
         """在终端打印本次调参摘要."""
-        self.get_logger().info('===== pid_tuning_v4 调参指标汇总（OFFBOARD） =====')
         self.get_logger().info(
-            f"status={metrics.get('status')} | offboard_rows={metrics.get('offboard_rows')} | "
-            f"eval_rows={metrics.get('eval_rows')} | z_eval_rows={metrics.get('z_eval_rows')} | "
+            '===== dynamic_tracking_v2 调参指标汇总（OFFBOARD） ====='
+        )
+        self.get_logger().info(
+            f"status={metrics.get('status')} | "
+            f"offboard_rows={metrics.get('offboard_rows')} | "
+            f"eval_rows={metrics.get('eval_rows')} | "
+            f"z_eval_rows={metrics.get('z_eval_rows')} | "
             f"fresh_ratio={metrics.get('fresh_ratio', float('nan')):.4f} | "
-            f"distance_valid_ratio={metrics.get('distance_valid_ratio', float('nan')):.4f} | "
             f"max_stale_s={metrics.get('max_stale_s', float('nan')):.3f} | "
-            f"max_abs_yaw_rate={metrics.get('max_abs_yaw_rate', float('nan')):.4f}"
+            f"max_abs_yaw_rate="
+            f"{metrics.get('max_abs_yaw_rate', float('nan')):.4f}"
         )
         if metrics.get('status') == 'ok':
             self.get_logger().info(
-                f"RMSE: x={metrics['rmse_x']:.4f}, y={metrics['rmse_y']:.4f}, "
-                f"z={metrics['rmse_z']:.4f}, xy={metrics['rmse_xy']:.4f}"
+                f"RMSE: x={metrics['rmse_x']:.4f}, "
+                f"y={metrics['rmse_y']:.4f}, "
+                f"z={metrics['rmse_z']:.4f}, "
+                f"xy={metrics['rmse_xy']:.4f}, "
+                f"yaw={metrics['rmse_yaw']:.4f}"
             )
             self.get_logger().info(
-                f"P95: |x|={metrics['p95_abs_x']:.4f}, |y|={metrics['p95_abs_y']:.4f}, "
-                f"|z|={metrics['p95_abs_z']:.4f}, xy={metrics['p95_xy']:.4f}"
+                f"P95: |x|={metrics['p95_abs_x']:.4f}, "
+                f"|y|={metrics['p95_abs_y']:.4f}, "
+                f"|z|={metrics['p95_abs_z']:.4f}, "
+                f"xy={metrics['p95_xy']:.4f}, "
+                f"|yaw|={metrics['p95_abs_yaw']:.4f}"
             )
             self.get_logger().info(
-                f"CmdJitter: x={metrics['cmd_jitter_x']:.5f}, y={metrics['cmd_jitter_y']:.5f}, "
+                f"CmdJitter: x={metrics['cmd_jitter_x']:.5f}, "
+                f"y={metrics['cmd_jitter_y']:.5f}, "
                 f"xy={metrics['cmd_jitter_xy']:.5f}"
             )
 
@@ -874,7 +834,7 @@ class PidTuningV4CsvLoggerNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PidTuningV4CsvLoggerNode()
+    node = DynamicTrackingV2CsvLoggerNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

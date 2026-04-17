@@ -47,6 +47,18 @@ def generate_launch_description():
         default_value='mjpeg2rgb',
         description='像素格式，常用 mjpeg2rgb 或 yuyv2rgb'
     )
+
+    camera_name_arg = DeclareLaunchArgument(
+        'camera_name',
+        default_value='default_cam',
+        description='相机名称，用于区分不同相机或不同分辨率的标定结果'
+    )
+
+    camera_info_url_arg = DeclareLaunchArgument(
+        'camera_info_url',
+        default_value='file:///home/zjh/.ros/camera_info/default_cam.yaml',
+        description='标定文件保存地址，使用 file:/// 形式避免覆盖旧标定'
+    )
     
     size_arg = DeclareLaunchArgument(
         'size',
@@ -79,6 +91,8 @@ def generate_launch_description():
         image_height_arg,
         framerate_arg,
         pixel_format_arg,
+        camera_name_arg,
+        camera_info_url_arg,
         size_arg,
         square_arg,
         calib_queue_size_arg,
@@ -97,7 +111,9 @@ def generate_launch_description():
                 'pixel_format': LaunchConfiguration('pixel_format'),
                 'framerate': LaunchConfiguration('framerate'),
                 'camera_frame_id': 'camera_link',
-                'camera_name': 'default_cam',  # ✅ 添加相机名称
+                # 允许为不同相机/分辨率保存独立标定文件，避免覆盖默认标定。
+                'camera_name': LaunchConfiguration('camera_name'),
+                'camera_info_url': LaunchConfiguration('camera_info_url'),
             }],
         ),
 
@@ -119,6 +135,7 @@ def generate_launch_description():
             arguments=[
                 '--size', LaunchConfiguration('size'),
                 '--square', LaunchConfiguration('square'),
+                '--camera_name', LaunchConfiguration('camera_name'),
                 '--queue-size', LaunchConfiguration('calib_queue_size'),
                 '--max-chessboard-speed', LaunchConfiguration('max_chessboard_speed'),
             ],

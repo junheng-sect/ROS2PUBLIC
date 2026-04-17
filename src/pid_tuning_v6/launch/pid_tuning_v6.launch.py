@@ -61,9 +61,7 @@ def generate_launch_description():
         'camera_yaw_compensation_deg'
     )
 
-    vxy_limit = LaunchConfiguration('vxy_limit')
-    vx_limit = LaunchConfiguration('vx_limit')
-    vy_limit = LaunchConfiguration('vy_limit')
+    v_limit = LaunchConfiguration('v_limit')
     vz_limit = LaunchConfiguration('vz_limit')
     velocity_deadband = LaunchConfiguration('velocity_deadband')
     control_rate_hz = LaunchConfiguration('control_rate_hz')
@@ -108,9 +106,9 @@ def generate_launch_description():
     )
 
     controller_node = Node(
-        package='pid_tuning_v4',
-        executable='pid_tuning_v4_node',
-        name='pid_tuning_v4_node',
+        package='pid_tuning_v6',
+        executable='pid_tuning_v6_node',
+        name='pid_tuning_v6_node',
         output='screen',
         parameters=[{
             'pose_topic': '/debug/aruco_pose',
@@ -133,9 +131,7 @@ def generate_launch_description():
             'ki_z': ki_z,
             'kd_z': kd_z,
             'camera_yaw_compensation_deg': camera_yaw_compensation_deg,
-            'vxy_limit': vxy_limit,
-            'vx_limit': vx_limit,
-            'vy_limit': vy_limit,
+            'v_limit': v_limit,
             'vz_limit': vz_limit,
             'velocity_deadband': velocity_deadband,
             'control_rate_hz': control_rate_hz,
@@ -147,9 +143,9 @@ def generate_launch_description():
     )
 
     csv_logger_node = Node(
-        package='pid_tuning_v4',
-        executable='pid_tuning_v4_csv_logger_node',
-        name='pid_tuning_v4_csv_logger_node',
+        package='pid_tuning_v6',
+        executable='pid_tuning_v6_csv_logger_node',
+        name='pid_tuning_v6_csv_logger_node',
         output='screen',
         condition=IfCondition(enable_csv_logger),
         parameters=[{
@@ -181,9 +177,7 @@ def generate_launch_description():
             'ki_z': ki_z,
             'kd_z': kd_z,
             'camera_yaw_compensation_deg': camera_yaw_compensation_deg,
-            'vxy_limit': vxy_limit,
-            'vx_limit': vx_limit,
-            'vy_limit': vy_limit,
+            'v_limit': v_limit,
             'vz_limit': vz_limit,
             'velocity_deadband': velocity_deadband,
             'control_rate_hz': control_rate_hz,
@@ -214,12 +208,12 @@ def generate_launch_description():
             'csv_output_dir',
             default_value=os.path.expanduser('~/project/rasip_pi_ws/log/tracking_csv'),
         ),
-        DeclareLaunchArgument('csv_prefix', default_value='pid_tuning_v4'),
+        DeclareLaunchArgument('csv_prefix', default_value='pid_tuning_v6'),
         DeclareLaunchArgument('csv_sample_rate_hz', default_value='30.0'),
         DeclareLaunchArgument(
             'summary_csv_path',
             default_value=os.path.expanduser(
-                '~/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v4_summary.csv'
+                '~/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v6_summary.csv'
             ),
         ),
         DeclareLaunchArgument('raw_tvec_topic', default_value='/debug/tvec'),
@@ -245,9 +239,7 @@ def generate_launch_description():
         DeclareLaunchArgument('ki_z', default_value='0.0'),
         DeclareLaunchArgument('kd_z', default_value='0.06'),
         DeclareLaunchArgument('camera_yaw_compensation_deg', default_value='0.0'),
-        DeclareLaunchArgument('vxy_limit', default_value='0.8'),
-        DeclareLaunchArgument('vx_limit', default_value='nan'),
-        DeclareLaunchArgument('vy_limit', default_value='nan'),
+        DeclareLaunchArgument('v_limit', default_value='0.8'),
         DeclareLaunchArgument('vz_limit', default_value='0.5'),
         DeclareLaunchArgument('velocity_deadband', default_value='0.03'),
         DeclareLaunchArgument('control_rate_hz', default_value='30.0'),

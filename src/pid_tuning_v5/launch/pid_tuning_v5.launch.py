@@ -71,6 +71,7 @@ def generate_launch_description():
     stale_timeout_sec = LaunchConfiguration('stale_timeout_sec')
     require_offboard = LaunchConfiguration('require_offboard')
     enable_z_hold = LaunchConfiguration('enable_z_hold')
+    offboard_entry_ramp_sec = LaunchConfiguration('offboard_entry_ramp_sec')
 
     # 复用 rasip_pi_ws 当前实机视觉主链：
     # usb_cam(可选) -> /debug/tvec -> tvec_tf_node -> /debug/aruco_pose
@@ -108,9 +109,9 @@ def generate_launch_description():
     )
 
     controller_node = Node(
-        package='pid_tuning_v4',
-        executable='pid_tuning_v4_node',
-        name='pid_tuning_v4_node',
+        package='pid_tuning_v5',
+        executable='pid_tuning_v5_node',
+        name='pid_tuning_v5_node',
         output='screen',
         parameters=[{
             'pose_topic': '/debug/aruco_pose',
@@ -143,13 +144,14 @@ def generate_launch_description():
             'distance_sensor_timeout_sec': distance_sensor_timeout_sec,
             'require_offboard': require_offboard,
             'enable_z_hold': enable_z_hold,
+            'offboard_entry_ramp_sec': offboard_entry_ramp_sec,
         }],
     )
 
     csv_logger_node = Node(
-        package='pid_tuning_v4',
-        executable='pid_tuning_v4_csv_logger_node',
-        name='pid_tuning_v4_csv_logger_node',
+        package='pid_tuning_v5',
+        executable='pid_tuning_v5_csv_logger_node',
+        name='pid_tuning_v5_csv_logger_node',
         output='screen',
         condition=IfCondition(enable_csv_logger),
         parameters=[{
@@ -191,6 +193,7 @@ def generate_launch_description():
             'distance_sensor_timeout_sec': distance_sensor_timeout_sec,
             'require_offboard': require_offboard,
             'enable_z_hold': enable_z_hold,
+            'offboard_entry_ramp_sec': offboard_entry_ramp_sec,
         }],
     )
 
@@ -214,12 +217,12 @@ def generate_launch_description():
             'csv_output_dir',
             default_value=os.path.expanduser('~/project/rasip_pi_ws/log/tracking_csv'),
         ),
-        DeclareLaunchArgument('csv_prefix', default_value='pid_tuning_v4'),
+        DeclareLaunchArgument('csv_prefix', default_value='pid_tuning_v5'),
         DeclareLaunchArgument('csv_sample_rate_hz', default_value='30.0'),
         DeclareLaunchArgument(
             'summary_csv_path',
             default_value=os.path.expanduser(
-                '~/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v4_summary.csv'
+                '~/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v5_summary.csv'
             ),
         ),
         DeclareLaunchArgument('raw_tvec_topic', default_value='/debug/tvec'),
@@ -255,6 +258,7 @@ def generate_launch_description():
         DeclareLaunchArgument('stale_timeout_sec', default_value='0.5'),
         DeclareLaunchArgument('require_offboard', default_value='true'),
         DeclareLaunchArgument('enable_z_hold', default_value='true'),
+        DeclareLaunchArgument('offboard_entry_ramp_sec', default_value='0.3'),
         tvec_launch,
         tvec_tf_node,
         controller_node,

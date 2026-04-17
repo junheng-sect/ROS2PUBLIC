@@ -35,14 +35,10 @@ def generate_launch_description():
     raw_tvec_topic = LaunchConfiguration('raw_tvec_topic')
     attitude_topic = LaunchConfiguration('attitude_topic')
 
-    distance_sensor_topic = LaunchConfiguration('distance_sensor_topic')
-    distance_sensor_timeout_sec = LaunchConfiguration(
-        'distance_sensor_timeout_sec'
-    )
-
     target_x = LaunchConfiguration('target_x')
     target_y = LaunchConfiguration('target_y')
     target_z = LaunchConfiguration('target_z')
+    target_yaw = LaunchConfiguration('target_yaw')
 
     kp_xy = LaunchConfiguration('kp_xy')
     ki_xy = LaunchConfiguration('ki_xy')
@@ -57,14 +53,16 @@ def generate_launch_description():
     kp_z = LaunchConfiguration('kp_z')
     ki_z = LaunchConfiguration('ki_z')
     kd_z = LaunchConfiguration('kd_z')
+    kp_yaw = LaunchConfiguration('kp_yaw')
+    ki_yaw = LaunchConfiguration('ki_yaw')
+    kd_yaw = LaunchConfiguration('kd_yaw')
     camera_yaw_compensation_deg = LaunchConfiguration(
         'camera_yaw_compensation_deg'
     )
 
-    vxy_limit = LaunchConfiguration('vxy_limit')
-    vx_limit = LaunchConfiguration('vx_limit')
-    vy_limit = LaunchConfiguration('vy_limit')
+    v_limit = LaunchConfiguration('v_limit')
     vz_limit = LaunchConfiguration('vz_limit')
+    yaw_rate_limit = LaunchConfiguration('yaw_rate_limit')
     velocity_deadband = LaunchConfiguration('velocity_deadband')
     control_rate_hz = LaunchConfiguration('control_rate_hz')
     pose_timeout_sec = LaunchConfiguration('pose_timeout_sec')
@@ -108,18 +106,18 @@ def generate_launch_description():
     )
 
     controller_node = Node(
-        package='pid_tuning_v4',
-        executable='pid_tuning_v4_node',
-        name='pid_tuning_v4_node',
+        package='dynamic_tracking_v2',
+        executable='dynamic_tracking_v2_node',
+        name='dynamic_tracking_v2_node',
         output='screen',
         parameters=[{
             'pose_topic': '/debug/aruco_pose',
             'state_topic': '/mavros/state',
-            'distance_sensor_topic': distance_sensor_topic,
             'setpoint_raw_topic': '/mavros/setpoint_raw/local',
             'target_x': target_x,
             'target_y': target_y,
             'target_z': target_z,
+            'target_yaw': target_yaw,
             'kp_xy': kp_xy,
             'ki_xy': ki_xy,
             'kd_xy': kd_xy,
@@ -132,31 +130,31 @@ def generate_launch_description():
             'kp_z': kp_z,
             'ki_z': ki_z,
             'kd_z': kd_z,
+            'kp_yaw': kp_yaw,
+            'ki_yaw': ki_yaw,
+            'kd_yaw': kd_yaw,
             'camera_yaw_compensation_deg': camera_yaw_compensation_deg,
-            'vxy_limit': vxy_limit,
-            'vx_limit': vx_limit,
-            'vy_limit': vy_limit,
+            'v_limit': v_limit,
             'vz_limit': vz_limit,
+            'yaw_rate_limit': yaw_rate_limit,
             'velocity_deadband': velocity_deadband,
             'control_rate_hz': control_rate_hz,
             'pose_timeout_sec': pose_timeout_sec,
-            'distance_sensor_timeout_sec': distance_sensor_timeout_sec,
             'require_offboard': require_offboard,
             'enable_z_hold': enable_z_hold,
         }],
     )
 
     csv_logger_node = Node(
-        package='pid_tuning_v4',
-        executable='pid_tuning_v4_csv_logger_node',
-        name='pid_tuning_v4_csv_logger_node',
+        package='dynamic_tracking_v2',
+        executable='dynamic_tracking_v2_csv_logger_node',
+        name='dynamic_tracking_v2_csv_logger_node',
         output='screen',
         condition=IfCondition(enable_csv_logger),
         parameters=[{
             'pose_topic': '/debug/aruco_pose',
             'raw_tvec_topic': raw_tvec_topic,
             'state_topic': '/mavros/state',
-            'distance_sensor_topic': distance_sensor_topic,
             'local_pose_topic': '/mavros/local_position/pose',
             'attitude_topic': attitude_topic,
             'setpoint_raw_topic': '/mavros/setpoint_raw/local',
@@ -168,6 +166,7 @@ def generate_launch_description():
             'target_x': target_x,
             'target_y': target_y,
             'target_z': target_z,
+            'target_yaw': target_yaw,
             'kp_xy': kp_xy,
             'ki_xy': ki_xy,
             'kd_xy': kd_xy,
@@ -180,15 +179,16 @@ def generate_launch_description():
             'kp_z': kp_z,
             'ki_z': ki_z,
             'kd_z': kd_z,
+            'kp_yaw': kp_yaw,
+            'ki_yaw': ki_yaw,
+            'kd_yaw': kd_yaw,
             'camera_yaw_compensation_deg': camera_yaw_compensation_deg,
-            'vxy_limit': vxy_limit,
-            'vx_limit': vx_limit,
-            'vy_limit': vy_limit,
+            'v_limit': v_limit,
             'vz_limit': vz_limit,
+            'yaw_rate_limit': yaw_rate_limit,
             'velocity_deadband': velocity_deadband,
             'control_rate_hz': control_rate_hz,
             'pose_timeout_sec': pose_timeout_sec,
-            'distance_sensor_timeout_sec': distance_sensor_timeout_sec,
             'require_offboard': require_offboard,
             'enable_z_hold': enable_z_hold,
         }],
@@ -199,7 +199,10 @@ def generate_launch_description():
         DeclareLaunchArgument('model_name', default_value='x500_mono_cam_down_0'),
         # 实机默认跟随 rasip_pi_ws 当前真实相机链路；仿真复用时改为 /camera/image_raw。
         DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
-        DeclareLaunchArgument('annotated_image_topic', default_value='/tvec/image_annotated'),
+        DeclareLaunchArgument(
+            'annotated_image_topic',
+            default_value='/tvec/image_annotated',
+        ),
         DeclareLaunchArgument('use_rqt', default_value='false'),
         DeclareLaunchArgument('use_usb_cam', default_value='true'),
         DeclareLaunchArgument('video_device', default_value='/dev/video0'),
@@ -207,31 +210,36 @@ def generate_launch_description():
         DeclareLaunchArgument('image_height', default_value='480'),
         DeclareLaunchArgument('pixel_format', default_value='mjpeg2rgb'),
         DeclareLaunchArgument('framerate', default_value='30.0'),
-        DeclareLaunchArgument('image_qos_reliability', default_value='best_effort'),
-        DeclareLaunchArgument('aruco_dictionary', default_value='DICT_5X5_1000'),
+        DeclareLaunchArgument(
+            'image_qos_reliability',
+            default_value='best_effort',
+        ),
+        DeclareLaunchArgument(
+            'aruco_dictionary',
+            default_value='DICT_5X5_1000',
+        ),
         DeclareLaunchArgument('enable_csv_logger', default_value='true'),
         DeclareLaunchArgument(
             'csv_output_dir',
-            default_value=os.path.expanduser('~/project/rasip_pi_ws/log/tracking_csv'),
+            default_value=os.path.expanduser(
+                '~/project/rasip_pi_ws/log/tracking_csv'
+            ),
         ),
-        DeclareLaunchArgument('csv_prefix', default_value='pid_tuning_v4'),
+        DeclareLaunchArgument('csv_prefix', default_value='dynamic_tracking_v2'),
         DeclareLaunchArgument('csv_sample_rate_hz', default_value='30.0'),
         DeclareLaunchArgument(
             'summary_csv_path',
             default_value=os.path.expanduser(
-                '~/project/rasip_pi_ws/log/tracking_csv/pid_tuning_v4_summary.csv'
+                '~/project/rasip_pi_ws/log/tracking_csv/'
+                'dynamic_tracking_v2_summary.csv'
             ),
         ),
         DeclareLaunchArgument('raw_tvec_topic', default_value='/debug/tvec'),
         DeclareLaunchArgument('attitude_topic', default_value='/mavros/imu/data'),
-        DeclareLaunchArgument(
-            'distance_sensor_topic',
-            default_value='/mavros/hrlv_ez4_pub',
-        ),
-        DeclareLaunchArgument('distance_sensor_timeout_sec', default_value='0.5'),
         DeclareLaunchArgument('target_x', default_value='0.0'),
         DeclareLaunchArgument('target_y', default_value='0.0'),
         DeclareLaunchArgument('target_z', default_value='2.5'),
+        DeclareLaunchArgument('target_yaw', default_value='0.0'),
         DeclareLaunchArgument('kp_xy', default_value='0.5'),
         DeclareLaunchArgument('ki_xy', default_value='0.0'),
         DeclareLaunchArgument('kd_xy', default_value='0.08'),
@@ -241,14 +249,19 @@ def generate_launch_description():
         DeclareLaunchArgument('kp_y', default_value='nan'),
         DeclareLaunchArgument('ki_y', default_value='nan'),
         DeclareLaunchArgument('kd_y', default_value='nan'),
-        DeclareLaunchArgument('kp_z', default_value='0.8'),
+        DeclareLaunchArgument('kp_z', default_value='0.5'),
         DeclareLaunchArgument('ki_z', default_value='0.0'),
-        DeclareLaunchArgument('kd_z', default_value='0.06'),
-        DeclareLaunchArgument('camera_yaw_compensation_deg', default_value='0.0'),
-        DeclareLaunchArgument('vxy_limit', default_value='0.8'),
-        DeclareLaunchArgument('vx_limit', default_value='nan'),
-        DeclareLaunchArgument('vy_limit', default_value='nan'),
-        DeclareLaunchArgument('vz_limit', default_value='0.5'),
+        DeclareLaunchArgument('kd_z', default_value='0.03'),
+        DeclareLaunchArgument('kp_yaw', default_value='0.4'),
+        DeclareLaunchArgument('ki_yaw', default_value='0.0'),
+        DeclareLaunchArgument('kd_yaw', default_value='0.03'),
+        DeclareLaunchArgument(
+            'camera_yaw_compensation_deg',
+            default_value='0.0',
+        ),
+        DeclareLaunchArgument('v_limit', default_value='0.8'),
+        DeclareLaunchArgument('vz_limit', default_value='0.3'),
+        DeclareLaunchArgument('yaw_rate_limit', default_value='0.4'),
         DeclareLaunchArgument('velocity_deadband', default_value='0.03'),
         DeclareLaunchArgument('control_rate_hz', default_value='30.0'),
         DeclareLaunchArgument('pose_timeout_sec', default_value='0.5'),

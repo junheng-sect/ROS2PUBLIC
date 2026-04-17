@@ -11,8 +11,6 @@
       - 'command'
       # /mavros/local_position/pose、/velocity_local
       - 'local_position'
-      # /mavros/imu/data
-      - 'imu'
       # /mavros/global_position/global、/rel_alt
       - 'global_position'
       # /mavros/altitude

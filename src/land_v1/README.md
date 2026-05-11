@@ -125,6 +125,16 @@ usb_cam(可选) -> /debug/tvec -> tvec_tf_node -> /debug/aruco_pose
 ros2 launch land_v1 land_v1.launch.py
 ```
 
+切换相机 profile：
+
+```bash
+ros2 launch land_v1 land_v1.launch.py \
+  camera_profile:=old_cam
+
+ros2 launch land_v1 land_v1.launch.py \
+  camera_profile:=icspring_1080
+```
+
 若需要复用外部图像流、不启动 USB 相机：
 
 ```bash
@@ -135,6 +145,8 @@ ros2 launch land_v1 land_v1.launch.py \
 
 与 `pid_tuning_v4` 同风格的共享显式参数：
 
+- `camera_profile`
+- `publish_annotated_image`
 - `use_usb_cam`
 - `video_device`
 - `ros_image_topic`
@@ -170,6 +182,8 @@ ros2 launch land_v1 land_v1.launch.py \
 - `distance_sensor_timeout_sec`
 - `require_offboard`
 
+`camera_profile` 的统一配置文件位于 `src/tvec/config/camera_profiles.yaml`。后续新增相机时，优先在该文件追加 profile，而不是再分叉一套视觉代码。
+
 `land_v1` 特有的可覆盖参数：
 
 - `align_mode`
@@ -204,6 +218,47 @@ colcon build --symlink-install --packages-select land_v1
 source install/setup.bash
 ros2 launch land_v1 land_v1.launch.py
 ```
+
+### 最新启动命令
+
+当前最常用的启动命令建议直接用下面这几条：
+
+新相机实机启动：
+
+```bash
+ros2 launch land_v1 land_v1.launch.py \
+  camera_profile:=icspring_1080 \
+  use_rqt:=false
+```
+
+旧相机实机启动：
+
+```bash
+ros2 launch land_v1 land_v1.launch.py \
+  camera_profile:=old_cam \
+  use_rqt:=false
+```
+
+关闭 USB 相机、复用外部图像流：
+
+```bash
+ros2 launch land_v1 land_v1.launch.py \
+  camera_profile:=icspring_1080 \
+  use_usb_cam:=false \
+  use_rqt:=false \
+  ros_image_topic:=/image_raw
+```
+
+仅保留位姿解算，不生成标注图：
+
+```bash
+ros2 launch land_v1 land_v1.launch.py \
+  camera_profile:=icspring_1080 \
+  publish_annotated_image:=false \
+  use_rqt:=false
+```
+
+如果外部图像来自仿真链路，通常把 `ros_image_topic` 改成 `/camera/image_raw`。
 
 ### 最小启动示例
 

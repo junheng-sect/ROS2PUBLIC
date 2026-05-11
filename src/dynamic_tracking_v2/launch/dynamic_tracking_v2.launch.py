@@ -3,12 +3,128 @@
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+
+PROFILE_OVERRIDE_SENTINEL = '__profile__'
+
+
+def _launch_value_as_bool(value: str) -> bool:
+    """把 launch 参数字符串统一转成布尔值。"""
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _create_csv_logger_node(
+    context,
+    *,
+    enable_csv_logger,
+    image_raw_timing_topic,
+    raw_tvec_topic,
+    pipeline_timing_topic,
+    attitude_topic,
+    csv_output_dir,
+    csv_prefix,
+    csv_sample_rate_hz,
+    summary_csv_path,
+    target_x,
+    target_y,
+    target_z,
+    target_yaw,
+    kp_xy,
+    ki_xy,
+    kd_xy,
+    kp_x,
+    ki_x,
+    kd_x,
+    kp_y,
+    ki_y,
+    kd_y,
+    kp_z,
+    ki_z,
+    kd_z,
+    kp_yaw,
+    ki_yaw,
+    kd_yaw,
+    camera_yaw_compensation_deg,
+    v_limit,
+    vz_limit,
+    yaw_rate_limit,
+    velocity_deadband,
+    control_rate_hz,
+    pose_timeout_sec,
+    stale_timeout_sec,
+    require_offboard,
+    enable_z_hold,
+    camera_profile,
+    image_width,
+    image_height,
+    publish_annotated_image,
+):
+    """在 launch 展开阶段把元数据解析成字面量，避免 CSV logger 收到空字符串。"""
+    if not _launch_value_as_bool(enable_csv_logger.perform(context)):
+        return []
+
+    return [
+        Node(
+            package='dynamic_tracking_v2',
+            executable='dynamic_tracking_v2_csv_logger_node',
+            name='dynamic_tracking_v2_csv_logger_node',
+            output='screen',
+            parameters=[{
+                'pose_topic': '/debug/aruco_pose',
+                'image_raw_timing_topic': image_raw_timing_topic,
+                'raw_tvec_topic': raw_tvec_topic,
+                'pipeline_timing_topic': pipeline_timing_topic,
+                'state_topic': '/mavros/state',
+                'local_pose_topic': '/mavros/local_position/pose',
+                'attitude_topic': attitude_topic,
+                'setpoint_raw_topic': '/mavros/setpoint_raw/local',
+                'output_dir': csv_output_dir,
+                'file_prefix': csv_prefix,
+                'sample_rate_hz': csv_sample_rate_hz,
+                'stale_timeout_sec': stale_timeout_sec,
+                'summary_csv_path': summary_csv_path,
+                'target_x': target_x,
+                'target_y': target_y,
+                'target_z': target_z,
+                'target_yaw': target_yaw,
+                'kp_xy': kp_xy,
+                'ki_xy': ki_xy,
+                'kd_xy': kd_xy,
+                'kp_x': kp_x,
+                'ki_x': ki_x,
+                'kd_x': kd_x,
+                'kp_y': kp_y,
+                'ki_y': ki_y,
+                'kd_y': kd_y,
+                'kp_z': kp_z,
+                'ki_z': ki_z,
+                'kd_z': kd_z,
+                'kp_yaw': kp_yaw,
+                'ki_yaw': ki_yaw,
+                'kd_yaw': kd_yaw,
+                'camera_yaw_compensation_deg': camera_yaw_compensation_deg,
+                'v_limit': v_limit,
+                'vz_limit': vz_limit,
+                'yaw_rate_limit': yaw_rate_limit,
+                'velocity_deadband': velocity_deadband,
+                'control_rate_hz': control_rate_hz,
+                'pose_timeout_sec': pose_timeout_sec,
+                'require_offboard': require_offboard,
+                'enable_z_hold': enable_z_hold,
+                'camera_profile': camera_profile.perform(context),
+                'image_width': image_width.perform(context),
+                'image_height': image_height.perform(context),
+                'publish_annotated_image': _launch_value_as_bool(
+                    publish_annotated_image.perform(context)
+                ),
+            }],
+        )
+    ]
 
 
 def generate_launch_description():
@@ -17,6 +133,10 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
     annotated_image_topic = LaunchConfiguration('annotated_image_topic')
+    publish_annotated_image = LaunchConfiguration('publish_annotated_image')
+    camera_profile = LaunchConfiguration('camera_profile')
+    camera_name = LaunchConfiguration('camera_name')
+    camera_info_url = LaunchConfiguration('camera_info_url')
     use_rqt = LaunchConfiguration('use_rqt')
     use_usb_cam = LaunchConfiguration('use_usb_cam')
     video_device = LaunchConfiguration('video_device')
@@ -24,6 +144,15 @@ def generate_launch_description():
     image_height = LaunchConfiguration('image_height')
     pixel_format = LaunchConfiguration('pixel_format')
     framerate = LaunchConfiguration('framerate')
+    camera_fx = LaunchConfiguration('camera_fx')
+    camera_fy = LaunchConfiguration('camera_fy')
+    camera_cx = LaunchConfiguration('camera_cx')
+    camera_cy = LaunchConfiguration('camera_cy')
+    dist_k1 = LaunchConfiguration('dist_k1')
+    dist_k2 = LaunchConfiguration('dist_k2')
+    dist_p1 = LaunchConfiguration('dist_p1')
+    dist_p2 = LaunchConfiguration('dist_p2')
+    dist_k3 = LaunchConfiguration('dist_k3')
     image_qos_reliability = LaunchConfiguration('image_qos_reliability')
     aruco_dictionary = LaunchConfiguration('aruco_dictionary')
 
@@ -32,7 +161,9 @@ def generate_launch_description():
     csv_prefix = LaunchConfiguration('csv_prefix')
     csv_sample_rate_hz = LaunchConfiguration('csv_sample_rate_hz')
     summary_csv_path = LaunchConfiguration('summary_csv_path')
+    image_raw_timing_topic = LaunchConfiguration('image_raw_timing_topic')
     raw_tvec_topic = LaunchConfiguration('raw_tvec_topic')
+    pipeline_timing_topic = LaunchConfiguration('pipeline_timing_topic')
     attitude_topic = LaunchConfiguration('attitude_topic')
 
     target_x = LaunchConfiguration('target_x')
@@ -81,6 +212,10 @@ def generate_launch_description():
             'model_name': model_name,
             'ros_image_topic': ros_image_topic,
             'annotated_image_topic': annotated_image_topic,
+            'publish_annotated_image': publish_annotated_image,
+            'camera_profile': camera_profile,
+            'camera_name': camera_name,
+            'camera_info_url': camera_info_url,
             'use_rqt': use_rqt,
             'use_usb_cam': use_usb_cam,
             'video_device': video_device,
@@ -88,6 +223,15 @@ def generate_launch_description():
             'image_height': image_height,
             'pixel_format': pixel_format,
             'framerate': framerate,
+            'camera_fx': camera_fx,
+            'camera_fy': camera_fy,
+            'camera_cx': camera_cx,
+            'camera_cy': camera_cy,
+            'dist_k1': dist_k1,
+            'dist_k2': dist_k2,
+            'dist_p1': dist_p1,
+            'dist_p2': dist_p2,
+            'dist_k3': dist_k3,
             'image_qos_reliability': image_qos_reliability,
             'aruco_dictionary': aruco_dictionary,
         }.items(),
@@ -145,23 +289,17 @@ def generate_launch_description():
         }],
     )
 
-    csv_logger_node = Node(
-        package='dynamic_tracking_v2',
-        executable='dynamic_tracking_v2_csv_logger_node',
-        name='dynamic_tracking_v2_csv_logger_node',
-        output='screen',
-        condition=IfCondition(enable_csv_logger),
-        parameters=[{
-            'pose_topic': '/debug/aruco_pose',
+    csv_logger_node = OpaqueFunction(
+        function=_create_csv_logger_node,
+        kwargs={
+            'enable_csv_logger': enable_csv_logger,
+            'image_raw_timing_topic': image_raw_timing_topic,
             'raw_tvec_topic': raw_tvec_topic,
-            'state_topic': '/mavros/state',
-            'local_pose_topic': '/mavros/local_position/pose',
+            'pipeline_timing_topic': pipeline_timing_topic,
             'attitude_topic': attitude_topic,
-            'setpoint_raw_topic': '/mavros/setpoint_raw/local',
-            'output_dir': csv_output_dir,
-            'file_prefix': csv_prefix,
-            'sample_rate_hz': csv_sample_rate_hz,
-            'stale_timeout_sec': stale_timeout_sec,
+            'csv_output_dir': csv_output_dir,
+            'csv_prefix': csv_prefix,
+            'csv_sample_rate_hz': csv_sample_rate_hz,
             'summary_csv_path': summary_csv_path,
             'target_x': target_x,
             'target_y': target_y,
@@ -189,9 +327,14 @@ def generate_launch_description():
             'velocity_deadband': velocity_deadband,
             'control_rate_hz': control_rate_hz,
             'pose_timeout_sec': pose_timeout_sec,
+            'stale_timeout_sec': stale_timeout_sec,
             'require_offboard': require_offboard,
             'enable_z_hold': enable_z_hold,
-        }],
+            'camera_profile': camera_profile,
+            'image_width': image_width,
+            'image_height': image_height,
+            'publish_annotated_image': publish_annotated_image,
+        },
     )
 
     return LaunchDescription([
@@ -203,13 +346,29 @@ def generate_launch_description():
             'annotated_image_topic',
             default_value='/tvec/image_annotated',
         ),
+        DeclareLaunchArgument('publish_annotated_image', default_value='true'),
+        DeclareLaunchArgument('camera_profile', default_value='old_cam'),
+        DeclareLaunchArgument('camera_name', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument(
+            'camera_info_url',
+            default_value=PROFILE_OVERRIDE_SENTINEL,
+        ),
         DeclareLaunchArgument('use_rqt', default_value='false'),
         DeclareLaunchArgument('use_usb_cam', default_value='true'),
-        DeclareLaunchArgument('video_device', default_value='/dev/video0'),
-        DeclareLaunchArgument('image_width', default_value='640'),
-        DeclareLaunchArgument('image_height', default_value='480'),
-        DeclareLaunchArgument('pixel_format', default_value='mjpeg2rgb'),
-        DeclareLaunchArgument('framerate', default_value='30.0'),
+        DeclareLaunchArgument('video_device', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('image_width', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('image_height', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('pixel_format', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('framerate', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_fx', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_fy', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_cx', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_cy', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_k1', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_k2', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_p1', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_p2', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_k3', default_value=PROFILE_OVERRIDE_SENTINEL),
         DeclareLaunchArgument(
             'image_qos_reliability',
             default_value='best_effort',
@@ -234,7 +393,15 @@ def generate_launch_description():
                 'dynamic_tracking_v2_summary.csv'
             ),
         ),
+        DeclareLaunchArgument(
+            'image_raw_timing_topic',
+            default_value='/debug/image_raw_timing',
+        ),
         DeclareLaunchArgument('raw_tvec_topic', default_value='/debug/tvec'),
+        DeclareLaunchArgument(
+            'pipeline_timing_topic',
+            default_value='/debug/pipeline_timing',
+        ),
         DeclareLaunchArgument('attitude_topic', default_value='/mavros/imu/data'),
         DeclareLaunchArgument('target_x', default_value='0.0'),
         DeclareLaunchArgument('target_y', default_value='0.0'),

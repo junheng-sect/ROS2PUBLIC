@@ -4,7 +4,7 @@ import math
 import time
 
 import rclpy
-from debug_interface.msg import ArucoBasePose
+from debug_interface.msg import ArucoBasePose, PipelineTiming
 from mavros_msgs.msg import PositionTarget, State
 from rclpy.node import Node
 
@@ -225,6 +225,15 @@ class DynamicTrackingV2Node(Node):
             self.setpoint_raw_topic,
             10,
         )
+        # 发布完整视觉链 timing，供 CSV logger 直接记录真实节点内部时间点。
+        self.pipeline_timing_pub = self.create_publisher(
+            PipelineTiming,
+            '/debug/pipeline_timing',
+            10,
+        )
+
+        # 当前最新视觉样本在第 4 级真正进入回调的时刻。
+        self.latest_ctrl_cb_start_stamp = None
 
         self.control_timer = self.create_timer(
             1.0 / max(self.control_rate_hz, 1.0),
@@ -340,6 +349,8 @@ class DynamicTrackingV2Node(Node):
         self.pose = msg
         self.has_pose = True
         self.last_pose_time = self.get_clock().now()
+        # 第 4 级回调一进入就记录，后续用于区分控制节点排队与计算耗时。
+        self.latest_ctrl_cb_start_stamp = self.last_pose_time.to_msg()
 
     def is_pose_fresh(self) -> bool:
         """判断视觉位姿是否在允许时限内."""
@@ -354,6 +365,9 @@ class DynamicTrackingV2Node(Node):
         vy_body: float,
         vz_body_flu: float,
         yaw_rate: float,
+        *,
+        timing_pose_msg: ArucoBasePose | None = None,
+        ctrl_cb_start_stamp=None,
     ):
         """
         发布 BODY_NED 速度指令.
@@ -365,7 +379,9 @@ class DynamicTrackingV2Node(Node):
         - yaw 闭环输出 `yaw_rate`，不发布绝对 yaw 角
         """
         msg = PositionTarget()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        # 速度指令 header.stamp 与 timing 消息中的 setpoint_pub_stamp 必须严格一致。
+        setpoint_pub_stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = setpoint_pub_stamp
         msg.coordinate_frame = PositionTarget.FRAME_BODY_NED
         msg.type_mask = (
             PositionTarget.IGNORE_PX
@@ -381,6 +397,24 @@ class DynamicTrackingV2Node(Node):
         msg.velocity.z = float(vz_body_flu)
         msg.yaw_rate = float(yaw_rate)
         self.setpoint_pub.publish(msg)
+
+        if timing_pose_msg is None or ctrl_cb_start_stamp is None:
+            return
+
+        timing_msg = PipelineTiming()
+        timing_msg.header = timing_pose_msg.header
+        timing_msg.tvec_cb_start_stamp = timing_pose_msg.tvec_cb_start_stamp
+        timing_msg.tvec_cv_bridge_done_stamp = (
+            timing_pose_msg.tvec_cv_bridge_done_stamp
+        )
+        timing_msg.tvec_detect_done_stamp = timing_pose_msg.tvec_detect_done_stamp
+        timing_msg.tvec_pose_done_stamp = timing_pose_msg.tvec_pose_done_stamp
+        timing_msg.tvec_pub_stamp = timing_pose_msg.tvec_pub_stamp
+        timing_msg.tf_cb_start_stamp = timing_pose_msg.tf_cb_start_stamp
+        timing_msg.tf_pub_stamp = timing_pose_msg.tf_pub_stamp
+        timing_msg.ctrl_cb_start_stamp = ctrl_cb_start_stamp
+        timing_msg.setpoint_pub_stamp = setpoint_pub_stamp
+        self.pipeline_timing_pub.publish(timing_msg)
 
     def control_loop(self):
         """主控制循环：XY 保持主链，Z/yaw 使用视觉闭环."""
@@ -443,7 +477,14 @@ class DynamicTrackingV2Node(Node):
         # 只在最终发布前对 yaw_rate 做一次符号转换。
         yaw_rate = -self.pid_yaw.update(eyaw)
 
-        self.publish_body_velocity(vx, vy, vz, yaw_rate)
+        self.publish_body_velocity(
+            vx,
+            vy,
+            vz,
+            yaw_rate,
+            timing_pose_msg=self.pose,
+            ctrl_cb_start_stamp=self.latest_ctrl_cb_start_stamp,
+        )
         self.latest_status = (
             '闭环控制 | '
             f'ex_marker={ex_marker:.3f}, ey_marker={ey_marker:.3f} | '

@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 
 import csv
+import io
 import math
 import os
 from datetime import datetime
 from typing import Optional
 
 import rclpy
-from debug_interface.msg import ArucoBasePose, TVecRVec
+from debug_interface.msg import ArucoBasePose, ImageRawTiming, PipelineTiming, TVecRVec
 from geometry_msgs.msg import PoseStamped
 from mavros_msgs.msg import PositionTarget, State
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.time import Time
 from sensor_msgs.msg import Imu
 
 
@@ -23,7 +26,9 @@ class DynamicTrackingV2CsvLoggerNode(Node):
 
         # ===== 输入话题 =====
         self.declare_parameter('pose_topic', '/debug/aruco_pose')
+        self.declare_parameter('image_raw_timing_topic', '/debug/image_raw_timing')
         self.declare_parameter('raw_tvec_topic', '/debug/tvec')
+        self.declare_parameter('pipeline_timing_topic', '/debug/pipeline_timing')
         self.declare_parameter('state_topic', '/mavros/state')
         self.declare_parameter('local_pose_topic', '/mavros/local_position/pose')
         self.declare_parameter('attitude_topic', '/mavros/imu/data')
@@ -75,9 +80,34 @@ class DynamicTrackingV2CsvLoggerNode(Node):
         self.declare_parameter('pose_timeout_sec', 0.5)
         self.declare_parameter('require_offboard', True)
         self.declare_parameter('enable_z_hold', True)
+        # 记录运行时的相机元数据，便于后续按分辨率汇总延迟结果。
+        # 这里开启动态类型，兼容 launch 里传入的字符串/整数/布尔值。
+        dynamic_meta_descriptor = ParameterDescriptor(dynamic_typing=True)
+        self.declare_parameter(
+            'camera_profile',
+            '',
+            dynamic_meta_descriptor,
+        )
+        self.declare_parameter(
+            'image_width',
+            '',
+            dynamic_meta_descriptor,
+        )
+        self.declare_parameter(
+            'image_height',
+            '',
+            dynamic_meta_descriptor,
+        )
+        self.declare_parameter(
+            'publish_annotated_image',
+            True,
+            dynamic_meta_descriptor,
+        )
 
         self.pose_topic = self.get_parameter('pose_topic').value
+        self.image_raw_timing_topic = self.get_parameter('image_raw_timing_topic').value
         self.raw_tvec_topic = self.get_parameter('raw_tvec_topic').value
+        self.pipeline_timing_topic = self.get_parameter('pipeline_timing_topic').value
         self.state_topic = self.get_parameter('state_topic').value
         self.local_pose_topic = self.get_parameter('local_pose_topic').value
         self.attitude_topic = self.get_parameter('attitude_topic').value
@@ -130,6 +160,12 @@ class DynamicTrackingV2CsvLoggerNode(Node):
                 bool(self.get_parameter('require_offboard').value)
             ),
             'enable_z_hold': int(bool(self.get_parameter('enable_z_hold').value)),
+            'camera_profile': str(self.get_parameter('camera_profile').value),
+            'image_width': str(self.get_parameter('image_width').value),
+            'image_height': str(self.get_parameter('image_height').value),
+            'publish_annotated_image': int(
+                bool(self.get_parameter('publish_annotated_image').value)
+            ),
         }
         self.camera_yaw_compensation_rad = math.radians(
             self.param_snapshot['camera_yaw_compensation_deg']
@@ -138,17 +174,26 @@ class DynamicTrackingV2CsvLoggerNode(Node):
         # ===== 最新数据缓存 =====
         self.state_msg: Optional[State] = None
         self.pose_msg: Optional[ArucoBasePose] = None
+        self.image_raw_timing_msg: Optional[ImageRawTiming] = None
         self.raw_tvec_msg: Optional[TVecRVec] = None
+        self.pipeline_timing_msg: Optional[PipelineTiming] = None
         self.local_pose_msg: Optional[PoseStamped] = None
         self.attitude_msg: Optional[Imu] = None
         self.setpoint_msg: Optional[PositionTarget] = None
 
         self.pose_rx_time = None
+        self.image_raw_timing_rx_time = None
         self.raw_tvec_rx_time = None
+        self.pipeline_timing_rx_time = None
         self.local_pose_rx_time = None
         self.attitude_rx_time = None
         self.setpoint_rx_time = None
+        self.latest_image_header_stamp_time = None
+        self.latest_setpoint_publish_stamp_time = None
+        self.latest_image_to_setpoint_latency_sec = float('nan')
         self.last_flush_time = self.get_clock().now()
+        self.image_raw_timing_by_key = {}
+        self.image_raw_timing_key_order = []
 
         # ===== 指标缓存 =====
         self.metric_rows = []
@@ -194,6 +239,35 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             'sp_vy',
             'sp_vz',
             'sp_yaw_rate',
+            'image_header_stamp_sec',
+            'image_source_stamp_sec',
+            'image_received_stamp_sec',
+            'image_probe_pub_sec',
+            'tvec_cb_start_sec',
+            'tvec_cv_bridge_done_sec',
+            'tvec_detect_done_sec',
+            'tvec_pose_done_sec',
+            'tvec_pub_sec',
+            'tf_cb_start_sec',
+            'tf_pub_sec',
+            'ctrl_cb_start_sec',
+            'setpoint_pub_sec',
+            'setpoint_publish_stamp_sec',
+            'image_to_setpoint_latency_sec',
+            'image_header_to_source_sec',
+            'image_source_to_received_sec',
+            'image_source_to_tvec_cb_sec',
+            'tvec_queue_sec',
+            'tvec_cv_bridge_sec',
+            'tvec_detect_sec',
+            'tvec_pose_estimate_sec',
+            'tvec_publish_gap_sec',
+            'tf_queue_sec',
+            'tf_compute_sec',
+            'ctrl_queue_sec',
+            'ctrl_compute_sec',
+            'tvec_total_compute_sec',
+            'total_latency_sec',
             'target_x',
             'target_y',
             'target_z',
@@ -222,6 +296,10 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             'pose_timeout_sec',
             'require_offboard',
             'enable_z_hold',
+            'camera_profile',
+            'image_width',
+            'image_height',
+            'publish_annotated_image',
             'raw_tvec_x',
             'raw_tvec_y',
             'raw_tvec_z',
@@ -242,7 +320,19 @@ class DynamicTrackingV2CsvLoggerNode(Node):
 
         self.create_subscription(State, self.state_topic, self._on_state, 10)
         self.create_subscription(ArucoBasePose, self.pose_topic, self._on_pose, 10)
+        self.create_subscription(
+            ImageRawTiming,
+            self.image_raw_timing_topic,
+            self._on_image_raw_timing,
+            10,
+        )
         self.create_subscription(TVecRVec, self.raw_tvec_topic, self._on_raw_tvec, 10)
+        self.create_subscription(
+            PipelineTiming,
+            self.pipeline_timing_topic,
+            self._on_pipeline_timing,
+            10,
+        )
         self.create_subscription(
             PoseStamped,
             self.local_pose_topic,
@@ -270,13 +360,20 @@ class DynamicTrackingV2CsvLoggerNode(Node):
         )
         self.get_logger().info(
             '参数快照 | '
+            f'image_raw_timing_topic={self.image_raw_timing_topic} | '
             f'raw_tvec_topic={self.raw_tvec_topic} | '
+            f'pipeline_timing_topic={self.pipeline_timing_topic} | '
             f'attitude_topic={self.attitude_topic} | '
             f'camera_yaw_compensation_deg='
             f'{self.param_snapshot["camera_yaw_compensation_deg"]:.3f} | '
             f'v_limit={self.param_snapshot["v_limit"]:.3f} | '
             f'vz_limit={self.param_snapshot["vz_limit"]:.3f} | '
             f'yaw_rate_limit={self.param_snapshot["yaw_rate_limit"]:.3f} | '
+            f'camera_profile={self.param_snapshot["camera_profile"]} | '
+            f'image_width={self.param_snapshot["image_width"]} | '
+            f'image_height={self.param_snapshot["image_height"]} | '
+            f'publish_annotated_image='
+            f'{self.param_snapshot["publish_annotated_image"]} | '
             'Z 使用 aruco_z，yaw 使用 yaw_rel_corrected 闭环'
         )
 
@@ -326,6 +423,40 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             return 1e9
         return (now_time - stamp_time).nanoseconds / 1e9
 
+    @staticmethod
+    def _stamp_key(stamp_msg) -> Optional[tuple[int, int]]:
+        """把 builtin Time 转成字典键，便于跨话题按同一帧匹配 timing."""
+        if stamp_msg is None:
+            return None
+        try:
+            return (int(stamp_msg.sec), int(stamp_msg.nanosec))
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _time_from_stamp_msg(stamp_msg) -> Optional[Time]:
+        """把消息头时间戳转成 Time，便于统一计算端到端延迟."""
+        if stamp_msg is None:
+            return None
+        try:
+            return Time.from_msg(stamp_msg)
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _time_to_sec(stamp_time: Optional[Time]) -> float:
+        """把 Time 转成浮点秒，缺失时返回 NaN."""
+        if stamp_time is None:
+            return float('nan')
+        return stamp_time.nanoseconds / 1e9
+
+    @staticmethod
+    def _delta_sec(start_time: Optional[Time], end_time: Optional[Time]) -> float:
+        """计算两个时间戳差值；任一缺失时返回 NaN。"""
+        if start_time is None or end_time is None:
+            return float('nan')
+        return (end_time - start_time).nanoseconds / 1e9
+
     def _is_fresh(self, stamp_time, now_time, timeout_sec: float) -> bool:
         """判断数据是否仍处于新鲜时间窗内."""
         return self._age_sec(stamp_time, now_time) <= timeout_sec
@@ -336,10 +467,51 @@ class DynamicTrackingV2CsvLoggerNode(Node):
     def _on_pose(self, msg: ArucoBasePose):
         self.pose_msg = msg
         self.pose_rx_time = self.get_clock().now()
+        # /debug/aruco_pose.header.stamp 沿用图像原始时间戳，可直接视为感知链输入时刻。
+        self.latest_image_header_stamp_time = self._time_from_stamp_msg(
+            msg.header.stamp
+        )
+
+    def _on_image_raw_timing(self, msg: ImageRawTiming):
+        """缓存原始图像发布时间元信息，供后续按 header.stamp 精确匹配。"""
+        self.image_raw_timing_msg = msg
+        self.image_raw_timing_rx_time = self.get_clock().now()
+        key = self._stamp_key(msg.header.stamp)
+        if key is None:
+            return
+        self.image_raw_timing_by_key[key] = msg
+        self.image_raw_timing_key_order.append(key)
+        while len(self.image_raw_timing_key_order) > 256:
+            expired_key = self.image_raw_timing_key_order.pop(0)
+            if expired_key == key:
+                continue
+            self.image_raw_timing_by_key.pop(expired_key, None)
 
     def _on_raw_tvec(self, msg: TVecRVec):
         self.raw_tvec_msg = msg
         self.raw_tvec_rx_time = self.get_clock().now()
+
+    def _on_pipeline_timing(self, msg: PipelineTiming):
+        """优先记录各节点内部真实埋点，避免 logger 自己的接收时刻污染分析。"""
+        self.pipeline_timing_msg = msg
+        self.pipeline_timing_rx_time = self.get_clock().now()
+        self.latest_image_header_stamp_time = self._time_from_stamp_msg(
+            msg.header.stamp
+        )
+        self.latest_setpoint_publish_stamp_time = self._time_from_stamp_msg(
+            msg.setpoint_pub_stamp
+        )
+        self.latest_image_to_setpoint_latency_sec = float('nan')
+        if (
+            self.latest_image_header_stamp_time is not None
+            and self.latest_setpoint_publish_stamp_time is not None
+        ):
+            latency_sec = self._delta_sec(
+                self.latest_image_header_stamp_time,
+                self.latest_setpoint_publish_stamp_time,
+            )
+            if math.isfinite(latency_sec):
+                self.latest_image_to_setpoint_latency_sec = latency_sec
 
     def _on_local_pose(self, msg: PoseStamped):
         self.local_pose_msg = msg
@@ -352,6 +524,23 @@ class DynamicTrackingV2CsvLoggerNode(Node):
     def _on_setpoint(self, msg: PositionTarget):
         self.setpoint_msg = msg
         self.setpoint_rx_time = self.get_clock().now()
+        # 端到端延迟优先以 /debug/pipeline_timing 中的真实埋点为准；
+        # 若 timing 尚未到达，再临时回退为 setpoint 自身 header.stamp。
+        if self.pipeline_timing_msg is None:
+            self.latest_setpoint_publish_stamp_time = self._time_from_stamp_msg(
+                msg.header.stamp
+            )
+            self.latest_image_to_setpoint_latency_sec = float('nan')
+            if (
+                self.latest_image_header_stamp_time is not None
+                and self.latest_setpoint_publish_stamp_time is not None
+            ):
+                latency_sec = self._delta_sec(
+                    self.latest_image_header_stamp_time,
+                    self.latest_setpoint_publish_stamp_time,
+                )
+                if math.isfinite(latency_sec):
+                    self.latest_image_to_setpoint_latency_sec = latency_sec
 
     def _write_row(self):
         """按固定频率把当前控制状态写入单次 CSV."""
@@ -479,6 +668,136 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             sp_vz = float('nan')
             sp_yaw_rate = float('nan')
 
+        image_header_stamp_sec = self._time_to_sec(
+            self.latest_image_header_stamp_time
+        )
+        image_header_key = None
+        if self.pipeline_timing_msg is not None:
+            image_header_key = self._stamp_key(self.pipeline_timing_msg.header.stamp)
+        elif self.pose_msg is not None:
+            image_header_key = self._stamp_key(self.pose_msg.header.stamp)
+        image_raw_timing_msg = self.image_raw_timing_by_key.get(image_header_key)
+        if image_raw_timing_msg is not None:
+            image_source_time = self._time_from_stamp_msg(
+                image_raw_timing_msg.image_source_stamp
+            )
+            image_received_time = self._time_from_stamp_msg(
+                image_raw_timing_msg.image_received_stamp
+            )
+            image_probe_pub_time = self._time_from_stamp_msg(
+                image_raw_timing_msg.image_probe_pub_stamp
+            )
+        else:
+            image_source_time = None
+            image_received_time = None
+            image_probe_pub_time = None
+
+        timing_msg = self.pipeline_timing_msg
+        if timing_msg is not None:
+            tvec_cb_start_time = self._time_from_stamp_msg(
+                timing_msg.tvec_cb_start_stamp
+            )
+            tvec_cv_bridge_done_time = self._time_from_stamp_msg(
+                timing_msg.tvec_cv_bridge_done_stamp
+            )
+            tvec_detect_done_time = self._time_from_stamp_msg(
+                timing_msg.tvec_detect_done_stamp
+            )
+            tvec_pose_done_time = self._time_from_stamp_msg(
+                timing_msg.tvec_pose_done_stamp
+            )
+            tvec_pub_time = self._time_from_stamp_msg(timing_msg.tvec_pub_stamp)
+            tf_cb_start_time = self._time_from_stamp_msg(
+                timing_msg.tf_cb_start_stamp
+            )
+            tf_pub_time = self._time_from_stamp_msg(timing_msg.tf_pub_stamp)
+            ctrl_cb_start_time = self._time_from_stamp_msg(
+                timing_msg.ctrl_cb_start_stamp
+            )
+            setpoint_pub_time = self._time_from_stamp_msg(
+                timing_msg.setpoint_pub_stamp
+            )
+        else:
+            tvec_cb_start_time = None
+            tvec_cv_bridge_done_time = None
+            tvec_detect_done_time = None
+            tvec_pose_done_time = None
+            tvec_pub_time = None
+            tf_cb_start_time = None
+            tf_pub_time = None
+            ctrl_cb_start_time = None
+            setpoint_pub_time = self.latest_setpoint_publish_stamp_time
+
+        image_source_stamp_sec = self._time_to_sec(image_source_time)
+        image_received_stamp_sec = self._time_to_sec(image_received_time)
+        image_probe_pub_sec = self._time_to_sec(image_probe_pub_time)
+        tvec_cb_start_sec = self._time_to_sec(tvec_cb_start_time)
+        tvec_cv_bridge_done_sec = self._time_to_sec(tvec_cv_bridge_done_time)
+        tvec_detect_done_sec = self._time_to_sec(tvec_detect_done_time)
+        tvec_pose_done_sec = self._time_to_sec(tvec_pose_done_time)
+        tvec_pub_sec = self._time_to_sec(tvec_pub_time)
+        tf_cb_start_sec = self._time_to_sec(tf_cb_start_time)
+        tf_pub_sec = self._time_to_sec(tf_pub_time)
+        ctrl_cb_start_sec = self._time_to_sec(ctrl_cb_start_time)
+        setpoint_pub_sec = self._time_to_sec(setpoint_pub_time)
+        setpoint_publish_stamp_sec = self._time_to_sec(
+            self.latest_setpoint_publish_stamp_time
+        )
+        if math.isfinite(setpoint_pub_sec):
+            setpoint_publish_stamp_sec = setpoint_pub_sec
+
+        image_header_to_source_sec = self._delta_sec(
+            self.latest_image_header_stamp_time,
+            image_source_time,
+        )
+        image_source_to_received_sec = self._delta_sec(
+            image_source_time,
+            image_received_time,
+        )
+        image_source_to_tvec_cb_sec = self._delta_sec(
+            image_source_time,
+            tvec_cb_start_time,
+        )
+        tvec_queue_sec = self._delta_sec(
+            self.latest_image_header_stamp_time,
+            tvec_cb_start_time,
+        )
+        tvec_cv_bridge_sec = self._delta_sec(
+            tvec_cb_start_time,
+            tvec_cv_bridge_done_time,
+        )
+        tvec_detect_sec = self._delta_sec(
+            tvec_cv_bridge_done_time,
+            tvec_detect_done_time,
+        )
+        tvec_pose_estimate_sec = self._delta_sec(
+            tvec_detect_done_time,
+            tvec_pose_done_time,
+        )
+        tvec_publish_gap_sec = self._delta_sec(
+            tvec_pose_done_time,
+            tvec_pub_time,
+        )
+        tf_queue_sec = self._delta_sec(tvec_pub_time, tf_cb_start_time)
+        tf_compute_sec = self._delta_sec(tf_cb_start_time, tf_pub_time)
+        ctrl_queue_sec = self._delta_sec(tf_pub_time, ctrl_cb_start_time)
+        ctrl_compute_sec = self._delta_sec(
+            ctrl_cb_start_time,
+            setpoint_pub_time,
+        )
+        tvec_total_compute_sec = self._delta_sec(
+            tvec_cb_start_time,
+            tvec_pub_time,
+        )
+        total_latency_sec = self._delta_sec(
+            self.latest_image_header_stamp_time,
+            setpoint_pub_time,
+        )
+        image_to_setpoint_latency_sec = total_latency_sec
+        if not math.isfinite(image_to_setpoint_latency_sec):
+            image_to_setpoint_latency_sec = self.latest_image_to_setpoint_latency_sec
+            total_latency_sec = image_to_setpoint_latency_sec
+
         self.csv_writer.writerow([
             ros_time_sec,
             mode,
@@ -512,6 +831,35 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             sp_vy,
             sp_vz,
             sp_yaw_rate,
+            image_header_stamp_sec,
+            image_source_stamp_sec,
+            image_received_stamp_sec,
+            image_probe_pub_sec,
+            tvec_cb_start_sec,
+            tvec_cv_bridge_done_sec,
+            tvec_detect_done_sec,
+            tvec_pose_done_sec,
+            tvec_pub_sec,
+            tf_cb_start_sec,
+            tf_pub_sec,
+            ctrl_cb_start_sec,
+            setpoint_pub_sec,
+            setpoint_publish_stamp_sec,
+            image_to_setpoint_latency_sec,
+            image_header_to_source_sec,
+            image_source_to_received_sec,
+            image_source_to_tvec_cb_sec,
+            tvec_queue_sec,
+            tvec_cv_bridge_sec,
+            tvec_detect_sec,
+            tvec_pose_estimate_sec,
+            tvec_publish_gap_sec,
+            tf_queue_sec,
+            tf_compute_sec,
+            ctrl_queue_sec,
+            ctrl_compute_sec,
+            tvec_total_compute_sec,
+            total_latency_sec,
             self.param_snapshot['target_x'],
             self.param_snapshot['target_y'],
             self.param_snapshot['target_z'],
@@ -540,6 +888,10 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             self.param_snapshot['pose_timeout_sec'],
             self.param_snapshot['require_offboard'],
             self.param_snapshot['enable_z_hold'],
+            self.param_snapshot['camera_profile'],
+            self.param_snapshot['image_width'],
+            self.param_snapshot['image_height'],
+            self.param_snapshot['publish_annotated_image'],
             raw_tvec_x,
             raw_tvec_y,
             raw_tvec_z,
@@ -554,6 +906,7 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             't': ros_time_sec,
             'mode': mode,
             'aruco_fresh': aruco_fresh,
+            'setpoint_fresh': sp_fresh,
             'aruco_x': aruco_x,
             'aruco_y': aruco_y,
             'aruco_z': aruco_z,
@@ -561,6 +914,21 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             'sp_vx': sp_vx,
             'sp_vy': sp_vy,
             'sp_yaw_rate': sp_yaw_rate,
+            'latency_sec': image_to_setpoint_latency_sec,
+            'image_header_to_source_sec': image_header_to_source_sec,
+            'image_source_to_received_sec': image_source_to_received_sec,
+            'image_source_to_tvec_cb_sec': image_source_to_tvec_cb_sec,
+            'tvec_queue_sec': tvec_queue_sec,
+            'tvec_cv_bridge_sec': tvec_cv_bridge_sec,
+            'tvec_detect_sec': tvec_detect_sec,
+            'tvec_pose_estimate_sec': tvec_pose_estimate_sec,
+            'tvec_publish_gap_sec': tvec_publish_gap_sec,
+            'tvec_total_compute_sec': tvec_total_compute_sec,
+            'tf_queue_sec': tf_queue_sec,
+            'tf_compute_sec': tf_compute_sec,
+            'ctrl_queue_sec': ctrl_queue_sec,
+            'ctrl_compute_sec': ctrl_compute_sec,
+            'total_latency_sec': total_latency_sec,
         })
 
         if self._age_sec(self.last_flush_time, now_time) >= self.flush_interval_sec:
@@ -602,10 +970,26 @@ class DynamicTrackingV2CsvLoggerNode(Node):
         off_rows = [row for row in self.metric_rows if row['mode'] == 'OFFBOARD']
         eval_rows = [row for row in off_rows if row['aruco_fresh'] == 1]
 
+        def calc_stats(rows, key):
+            values = [
+                row[key]
+                for row in rows
+                if math.isfinite(row.get(key, float('nan')))
+            ]
+            return {
+                f'{key}_mean': (
+                    sum(values) / len(values) if values else float('nan')
+                ),
+                f'{key}_p50': self._quantile(values, 0.50),
+                f'{key}_p95': self._quantile(values, 0.95),
+                f'{key}_max': max(values) if values else float('nan'),
+            }
+
         result = {
             'eval_rows': len(eval_rows),
             'offboard_rows': len(off_rows),
             'z_eval_rows': len(eval_rows),
+            'latency_eval_rows': 0,
             'status': 'ok' if len(eval_rows) >= 1 else 'insufficient_data',
         }
 
@@ -614,9 +998,29 @@ class DynamicTrackingV2CsvLoggerNode(Node):
                 'fresh_ratio': float('nan'),
                 'max_stale_s': float('nan'),
                 'max_abs_yaw_rate': float('nan'),
+                'latency_mean_sec': float('nan'),
+                'latency_p50_sec': float('nan'),
+                'latency_p95_sec': float('nan'),
+                'latency_max_sec': float('nan'),
                 'rmse_yaw': float('nan'),
                 'p95_abs_yaw': float('nan'),
             })
+            for metric_name in (
+                'image_header_to_source_sec',
+                'image_source_to_received_sec',
+                'image_source_to_tvec_cb_sec',
+                'tvec_queue_sec',
+                'tvec_total_compute_sec',
+                'tvec_cv_bridge_sec',
+                'tvec_detect_sec',
+                'tvec_pose_estimate_sec',
+                'tf_queue_sec',
+                'tf_compute_sec',
+                'ctrl_queue_sec',
+                'ctrl_compute_sec',
+                'total_latency_sec',
+            ):
+                result.update(calc_stats([], metric_name))
             return result
 
         fresh_ratio = len(eval_rows) / len(off_rows)
@@ -649,6 +1053,43 @@ class DynamicTrackingV2CsvLoggerNode(Node):
                 max(yaw_rate_vals) if yaw_rate_vals else float('nan')
             ),
         })
+
+        latency_vals = [
+            row['latency_sec']
+            for row in off_rows
+            if row['aruco_fresh'] == 1
+            and row['setpoint_fresh'] == 1
+            and math.isfinite(row['latency_sec'])
+            and row['latency_sec'] >= 0.0
+        ]
+        result.update({
+            'latency_eval_rows': len(latency_vals),
+            'latency_mean_sec': (
+                sum(latency_vals) / len(latency_vals)
+                if latency_vals else float('nan')
+            ),
+            'latency_p50_sec': self._quantile(latency_vals, 0.50),
+            'latency_p95_sec': self._quantile(latency_vals, 0.95),
+            'latency_max_sec': (
+                max(latency_vals) if latency_vals else float('nan')
+            ),
+        })
+        for metric_name in (
+            'image_header_to_source_sec',
+            'image_source_to_received_sec',
+            'image_source_to_tvec_cb_sec',
+            'tvec_queue_sec',
+            'tvec_total_compute_sec',
+            'tvec_cv_bridge_sec',
+            'tvec_detect_sec',
+            'tvec_pose_estimate_sec',
+            'tf_queue_sec',
+            'tf_compute_sec',
+            'ctrl_queue_sec',
+            'ctrl_compute_sec',
+            'total_latency_sec',
+        ):
+            result.update(calc_stats(off_rows, metric_name))
 
         if not eval_rows:
             result.update({
@@ -703,8 +1144,8 @@ class DynamicTrackingV2CsvLoggerNode(Node):
         })
         return result
 
-    def _repair_summary_csv_if_needed(self, summary_path: str):
-        """统一行结束符并清理重复表头，避免历史格式问题影响后续追加."""
+    def _repair_summary_csv_if_needed(self, summary_path: str, fieldnames):
+        """统一 summary 表头与行结束符，兼容历史列集并补齐新增延迟字段."""
         if not os.path.exists(summary_path):
             return
         try:
@@ -714,31 +1155,45 @@ class DynamicTrackingV2CsvLoggerNode(Node):
                 return
 
             normalized = raw.replace('\r\n', '\n').replace('\r', '\n')
-            lines = [line for line in normalized.split('\n') if line.strip() != '']
-            if not lines:
+            if normalized.strip() == '':
                 return
 
-            header = lines[0]
-            cleaned = [header]
-            for line in lines[1:]:
-                if line == header:
-                    continue
-                cleaned.append(line)
+            reader = csv.DictReader(io.StringIO(normalized))
+            existing_fieldnames = reader.fieldnames or []
+            if not existing_fieldnames:
+                return
 
-            repaired = '\n'.join(cleaned) + '\n'
-            if repaired != raw:
+            cleaned_rows = []
+            for row in reader:
+                if row is None:
+                    continue
+                # 过滤历史文件里重复混入的数据表头行。
+                if all(
+                    str(row.get(name, '')).strip() == str(name)
+                    for name in existing_fieldnames
+                ):
+                    continue
+                cleaned_rows.append(row)
+
+            if normalized != raw or existing_fieldnames != fieldnames:
                 with open(summary_path, 'w', encoding='utf-8', newline='') as summary_file:
-                    summary_file.write(repaired)
+                    writer = csv.DictWriter(
+                        summary_file,
+                        fieldnames=fieldnames,
+                        lineterminator='\n',
+                    )
+                    writer.writeheader()
+                    for row in cleaned_rows:
+                        writer.writerow({
+                            name: row.get(name, '')
+                            for name in fieldnames
+                        })
                 self.get_logger().info(f'已修复 summary 格式: {summary_path}')
         except Exception as exc:
             self.get_logger().warn(f'summary 格式修复跳过: {exc}')
 
     def _append_summary_csv(self, metrics):
         """把本次运行摘要追加到 summary CSV."""
-        os.makedirs(os.path.dirname(self.summary_csv_path), exist_ok=True)
-        self._repair_summary_csv_if_needed(self.summary_csv_path)
-        file_exists = os.path.exists(self.summary_csv_path)
-
         row = {
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'run_csv': self.csv_path,
@@ -747,8 +1202,65 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             'offboard_rows': metrics.get('offboard_rows', 0),
             'eval_rows': metrics.get('eval_rows', 0),
             'z_eval_rows': metrics.get('z_eval_rows', 0),
+            'latency_eval_rows': metrics.get('latency_eval_rows', 0),
             'fresh_ratio': metrics.get('fresh_ratio', float('nan')),
             'max_stale_s': metrics.get('max_stale_s', float('nan')),
+            'latency_mean_sec': metrics.get('latency_mean_sec', float('nan')),
+            'latency_p50_sec': metrics.get('latency_p50_sec', float('nan')),
+            'latency_p95_sec': metrics.get('latency_p95_sec', float('nan')),
+            'latency_max_sec': metrics.get('latency_max_sec', float('nan')),
+            'image_header_to_source_sec_mean': metrics.get('image_header_to_source_sec_mean', float('nan')),
+            'image_header_to_source_sec_p50': metrics.get('image_header_to_source_sec_p50', float('nan')),
+            'image_header_to_source_sec_p95': metrics.get('image_header_to_source_sec_p95', float('nan')),
+            'image_header_to_source_sec_max': metrics.get('image_header_to_source_sec_max', float('nan')),
+            'image_source_to_received_sec_mean': metrics.get('image_source_to_received_sec_mean', float('nan')),
+            'image_source_to_received_sec_p50': metrics.get('image_source_to_received_sec_p50', float('nan')),
+            'image_source_to_received_sec_p95': metrics.get('image_source_to_received_sec_p95', float('nan')),
+            'image_source_to_received_sec_max': metrics.get('image_source_to_received_sec_max', float('nan')),
+            'image_source_to_tvec_cb_sec_mean': metrics.get('image_source_to_tvec_cb_sec_mean', float('nan')),
+            'image_source_to_tvec_cb_sec_p50': metrics.get('image_source_to_tvec_cb_sec_p50', float('nan')),
+            'image_source_to_tvec_cb_sec_p95': metrics.get('image_source_to_tvec_cb_sec_p95', float('nan')),
+            'image_source_to_tvec_cb_sec_max': metrics.get('image_source_to_tvec_cb_sec_max', float('nan')),
+            'tvec_queue_sec_mean': metrics.get('tvec_queue_sec_mean', float('nan')),
+            'tvec_queue_sec_p50': metrics.get('tvec_queue_sec_p50', float('nan')),
+            'tvec_queue_sec_p95': metrics.get('tvec_queue_sec_p95', float('nan')),
+            'tvec_queue_sec_max': metrics.get('tvec_queue_sec_max', float('nan')),
+            'tvec_total_compute_sec_mean': metrics.get('tvec_total_compute_sec_mean', float('nan')),
+            'tvec_total_compute_sec_p50': metrics.get('tvec_total_compute_sec_p50', float('nan')),
+            'tvec_total_compute_sec_p95': metrics.get('tvec_total_compute_sec_p95', float('nan')),
+            'tvec_total_compute_sec_max': metrics.get('tvec_total_compute_sec_max', float('nan')),
+            'tvec_cv_bridge_sec_mean': metrics.get('tvec_cv_bridge_sec_mean', float('nan')),
+            'tvec_cv_bridge_sec_p50': metrics.get('tvec_cv_bridge_sec_p50', float('nan')),
+            'tvec_cv_bridge_sec_p95': metrics.get('tvec_cv_bridge_sec_p95', float('nan')),
+            'tvec_cv_bridge_sec_max': metrics.get('tvec_cv_bridge_sec_max', float('nan')),
+            'tvec_detect_sec_mean': metrics.get('tvec_detect_sec_mean', float('nan')),
+            'tvec_detect_sec_p50': metrics.get('tvec_detect_sec_p50', float('nan')),
+            'tvec_detect_sec_p95': metrics.get('tvec_detect_sec_p95', float('nan')),
+            'tvec_detect_sec_max': metrics.get('tvec_detect_sec_max', float('nan')),
+            'tvec_pose_estimate_sec_mean': metrics.get('tvec_pose_estimate_sec_mean', float('nan')),
+            'tvec_pose_estimate_sec_p50': metrics.get('tvec_pose_estimate_sec_p50', float('nan')),
+            'tvec_pose_estimate_sec_p95': metrics.get('tvec_pose_estimate_sec_p95', float('nan')),
+            'tvec_pose_estimate_sec_max': metrics.get('tvec_pose_estimate_sec_max', float('nan')),
+            'tf_queue_sec_mean': metrics.get('tf_queue_sec_mean', float('nan')),
+            'tf_queue_sec_p50': metrics.get('tf_queue_sec_p50', float('nan')),
+            'tf_queue_sec_p95': metrics.get('tf_queue_sec_p95', float('nan')),
+            'tf_queue_sec_max': metrics.get('tf_queue_sec_max', float('nan')),
+            'tf_compute_sec_mean': metrics.get('tf_compute_sec_mean', float('nan')),
+            'tf_compute_sec_p50': metrics.get('tf_compute_sec_p50', float('nan')),
+            'tf_compute_sec_p95': metrics.get('tf_compute_sec_p95', float('nan')),
+            'tf_compute_sec_max': metrics.get('tf_compute_sec_max', float('nan')),
+            'ctrl_queue_sec_mean': metrics.get('ctrl_queue_sec_mean', float('nan')),
+            'ctrl_queue_sec_p50': metrics.get('ctrl_queue_sec_p50', float('nan')),
+            'ctrl_queue_sec_p95': metrics.get('ctrl_queue_sec_p95', float('nan')),
+            'ctrl_queue_sec_max': metrics.get('ctrl_queue_sec_max', float('nan')),
+            'ctrl_compute_sec_mean': metrics.get('ctrl_compute_sec_mean', float('nan')),
+            'ctrl_compute_sec_p50': metrics.get('ctrl_compute_sec_p50', float('nan')),
+            'ctrl_compute_sec_p95': metrics.get('ctrl_compute_sec_p95', float('nan')),
+            'ctrl_compute_sec_max': metrics.get('ctrl_compute_sec_max', float('nan')),
+            'total_latency_sec_mean': metrics.get('total_latency_sec_mean', float('nan')),
+            'total_latency_sec_p50': metrics.get('total_latency_sec_p50', float('nan')),
+            'total_latency_sec_p95': metrics.get('total_latency_sec_p95', float('nan')),
+            'total_latency_sec_max': metrics.get('total_latency_sec_max', float('nan')),
             'rmse_x': metrics.get('rmse_x', float('nan')),
             'rmse_y': metrics.get('rmse_y', float('nan')),
             'rmse_z': metrics.get('rmse_z', float('nan')),
@@ -767,6 +1279,9 @@ class DynamicTrackingV2CsvLoggerNode(Node):
         }
 
         fieldnames = list(row.keys())
+        os.makedirs(os.path.dirname(self.summary_csv_path), exist_ok=True)
+        self._repair_summary_csv_if_needed(self.summary_csv_path, fieldnames)
+        file_exists = os.path.exists(self.summary_csv_path)
         with open(self.summary_csv_path, 'a', newline='', encoding='utf-8') as summary_file:
             writer = csv.DictWriter(
                 summary_file,
@@ -787,11 +1302,46 @@ class DynamicTrackingV2CsvLoggerNode(Node):
             f"offboard_rows={metrics.get('offboard_rows')} | "
             f"eval_rows={metrics.get('eval_rows')} | "
             f"z_eval_rows={metrics.get('z_eval_rows')} | "
+            f"latency_eval_rows={metrics.get('latency_eval_rows')} | "
             f"fresh_ratio={metrics.get('fresh_ratio', float('nan')):.4f} | "
             f"max_stale_s={metrics.get('max_stale_s', float('nan')):.3f} | "
             f"max_abs_yaw_rate="
             f"{metrics.get('max_abs_yaw_rate', float('nan')):.4f}"
         )
+        if metrics.get('latency_eval_rows', 0) >= 1:
+            self.get_logger().info(
+                f"Latency: mean={metrics['latency_mean_sec']:.4f}s, "
+                f"p50={metrics['latency_p50_sec']:.4f}s, "
+                f"p95={metrics['latency_p95_sec']:.4f}s, "
+                f"max={metrics['latency_max_sec']:.4f}s"
+            )
+            self.get_logger().info(
+                'PipelineLatency: '
+                f"header_to_source(mean/p95)="
+                f"{metrics.get('image_header_to_source_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('image_header_to_source_sec_p95', float('nan')):.4f}s, "
+                f"source_to_tvec_cb(mean/p95)="
+                f"{metrics.get('image_source_to_tvec_cb_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('image_source_to_tvec_cb_sec_p95', float('nan')):.4f}s, "
+                f"tvec_queue(mean/p95)="
+                f"{metrics.get('tvec_queue_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('tvec_queue_sec_p95', float('nan')):.4f}s, "
+                f"tvec_total_compute(mean/p95)="
+                f"{metrics.get('tvec_total_compute_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('tvec_total_compute_sec_p95', float('nan')):.4f}s, "
+                f"tf_queue(mean/p95)="
+                f"{metrics.get('tf_queue_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('tf_queue_sec_p95', float('nan')):.4f}s, "
+                f"tf_compute(mean/p95)="
+                f"{metrics.get('tf_compute_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('tf_compute_sec_p95', float('nan')):.4f}s, "
+                f"ctrl_queue(mean/p95)="
+                f"{metrics.get('ctrl_queue_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('ctrl_queue_sec_p95', float('nan')):.4f}s, "
+                f"ctrl_compute(mean/p95)="
+                f"{metrics.get('ctrl_compute_sec_mean', float('nan')):.4f}/"
+                f"{metrics.get('ctrl_compute_sec_p95', float('nan')):.4f}s"
+            )
         if metrics.get('status') == 'ok':
             self.get_logger().info(
                 f"RMSE: x={metrics['rmse_x']:.4f}, "

@@ -41,7 +41,7 @@
 
 ## 启动命令
 
-实机默认示例（默认串口与 `mavros px4.launch` 保持一致）：
+实机默认示例（默认会自动探测常见飞控串口）：
 
 ```bash
 ros2 launch mavros_profiles workspace_minimal_px4.launch.py
@@ -54,7 +54,7 @@ ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
   enable_imu:=false
 ```
 
-若串口不是 `/dev/ttyS0:921600`，可手动覆盖：
+若自动探测没有选到正确串口，可手动覆盖：
 
 ```bash
 ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
@@ -77,6 +77,10 @@ ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
 
 说明：
 
+- `fcu_url:=auto` 时，本包会自动按平台探测常见飞控串口：
+  - 树莓派/ARM：优先尝试 `/dev/serial0`、`/dev/ttyAMA0`、`/dev/ttyS0`
+  - 通用 USB 飞控：优先尝试 `/dev/serial/by-id/*`、`/dev/ttyACM*`、`/dev/ttyUSB*`
+- 若当前主机根本没有探测到飞控串口，launch 会直接报错并提示手动传入 `fcu_url`，不再误用笔记本上无效的 `/dev/ttyS0`
 - `enable_imu:=true/false` 只用于在本包自带的两份最小插件清单之间切换
 - 若同时传入 `pluginlists_yaml:=...`，则以你手动指定的 YAML 为准
 

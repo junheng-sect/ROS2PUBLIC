@@ -11,12 +11,19 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+PROFILE_OVERRIDE_SENTINEL = '__profile__'
+
+
 def generate_launch_description():
     # 兼容保留 world/model 参数，便于和现有仿真入口保持一致。
     world_name = LaunchConfiguration('world_name')
     model_name = LaunchConfiguration('model_name')
     ros_image_topic = LaunchConfiguration('ros_image_topic')
     annotated_image_topic = LaunchConfiguration('annotated_image_topic')
+    publish_annotated_image = LaunchConfiguration('publish_annotated_image')
+    camera_profile = LaunchConfiguration('camera_profile')
+    camera_name = LaunchConfiguration('camera_name')
+    camera_info_url = LaunchConfiguration('camera_info_url')
     use_rqt = LaunchConfiguration('use_rqt')
     use_usb_cam = LaunchConfiguration('use_usb_cam')
     video_device = LaunchConfiguration('video_device')
@@ -24,6 +31,15 @@ def generate_launch_description():
     image_height = LaunchConfiguration('image_height')
     pixel_format = LaunchConfiguration('pixel_format')
     framerate = LaunchConfiguration('framerate')
+    camera_fx = LaunchConfiguration('camera_fx')
+    camera_fy = LaunchConfiguration('camera_fy')
+    camera_cx = LaunchConfiguration('camera_cx')
+    camera_cy = LaunchConfiguration('camera_cy')
+    dist_k1 = LaunchConfiguration('dist_k1')
+    dist_k2 = LaunchConfiguration('dist_k2')
+    dist_p1 = LaunchConfiguration('dist_p1')
+    dist_p2 = LaunchConfiguration('dist_p2')
+    dist_k3 = LaunchConfiguration('dist_k3')
     image_qos_reliability = LaunchConfiguration('image_qos_reliability')
     aruco_dictionary = LaunchConfiguration('aruco_dictionary')
 
@@ -81,6 +97,10 @@ def generate_launch_description():
             'model_name': model_name,
             'ros_image_topic': ros_image_topic,
             'annotated_image_topic': annotated_image_topic,
+            'publish_annotated_image': publish_annotated_image,
+            'camera_profile': camera_profile,
+            'camera_name': camera_name,
+            'camera_info_url': camera_info_url,
             'use_rqt': use_rqt,
             'use_usb_cam': use_usb_cam,
             'video_device': video_device,
@@ -88,6 +108,15 @@ def generate_launch_description():
             'image_height': image_height,
             'pixel_format': pixel_format,
             'framerate': framerate,
+            'camera_fx': camera_fx,
+            'camera_fy': camera_fy,
+            'camera_cx': camera_cx,
+            'camera_cy': camera_cy,
+            'dist_k1': dist_k1,
+            'dist_k2': dist_k2,
+            'dist_p1': dist_p1,
+            'dist_p2': dist_p2,
+            'dist_k3': dist_k3,
             'image_qos_reliability': image_qos_reliability,
             'aruco_dictionary': aruco_dictionary,
         }.items(),
@@ -194,13 +223,29 @@ def generate_launch_description():
         # 实机默认跟随 rasip_pi_ws 当前真实相机链路；仿真复用时改为 /camera/image_raw。
         DeclareLaunchArgument('ros_image_topic', default_value='/image_raw'),
         DeclareLaunchArgument('annotated_image_topic', default_value='/tvec/image_annotated'),
+        DeclareLaunchArgument('publish_annotated_image', default_value='true'),
+        DeclareLaunchArgument('camera_profile', default_value='old_cam'),
+        DeclareLaunchArgument('camera_name', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument(
+            'camera_info_url',
+            default_value=PROFILE_OVERRIDE_SENTINEL,
+        ),
         DeclareLaunchArgument('use_rqt', default_value='false'),
         DeclareLaunchArgument('use_usb_cam', default_value='true'),
-        DeclareLaunchArgument('video_device', default_value='/dev/video0'),
-        DeclareLaunchArgument('image_width', default_value='640'),
-        DeclareLaunchArgument('image_height', default_value='480'),
-        DeclareLaunchArgument('pixel_format', default_value='mjpeg2rgb'),
-        DeclareLaunchArgument('framerate', default_value='30.0'),
+        DeclareLaunchArgument('video_device', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('image_width', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('image_height', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('pixel_format', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('framerate', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_fx', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_fy', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_cx', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('camera_cy', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_k1', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_k2', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_p1', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_p2', default_value=PROFILE_OVERRIDE_SENTINEL),
+        DeclareLaunchArgument('dist_k3', default_value=PROFILE_OVERRIDE_SENTINEL),
         DeclareLaunchArgument('image_qos_reliability', default_value='best_effort'),
         DeclareLaunchArgument('aruco_dictionary', default_value='DICT_5X5_1000'),
         DeclareLaunchArgument('enable_csv_logger', default_value='true'),

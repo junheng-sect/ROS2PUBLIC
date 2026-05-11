@@ -128,9 +128,13 @@ def generate_launch_description():
                 'square': LaunchConfiguration('square'),
             }],
             remappings=[
-                ('image', LaunchConfiguration('camera_topic')),  # 图像话题可通过 launch 参数调整
-                ('camera_info', '/camera_info'),   # ✅ 显式映射 camera_info（推荐）
-                ('camera', 'usb_cam'),             # ✅ 用于 set_camera_info 服务
+                # 单目标定只需要图像与 camera_info 两个输入话题。
+                ('image', LaunchConfiguration('camera_topic')),
+                ('camera_info', '/camera_info'),
+                # cameracalibrator 内部固定访问 `camera/set_camera_info`。
+                # usb_cam 实际提供的服务名是 `/set_camera_info`，不是 `/usb_cam/set_camera_info`。
+                # 这里显式重映射服务名，避免点击 COMMIT 后同步 RPC 永久阻塞。
+                ('camera/set_camera_info', '/set_camera_info'),
             ],
             arguments=[
                 '--size', LaunchConfiguration('size'),

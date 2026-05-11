@@ -10,6 +10,8 @@
 ros2 launch camera_calibration_pkg camera_calibration.launch.py
 ```
 
+当前 launch 按单目相机使用，`COMMIT` 时会把标定结果通过 `usb_cam` 的 `/set_camera_info` 服务写回到 `camera_info_url` 指定的 yaml 文件。
+
 可选参数：
 - `camera_topic`：默认 `/image_raw`
 - `video_device`：默认 `/dev/video0`
@@ -71,6 +73,21 @@ ros2 run camera_calibration_pkg save_calibration
 结果默认保存到：`~/.ros/camera_info/default_cam.yaml`
 
 建议：完成采样后在标定窗口点击 `CALIBRATE`，再点击 `SAVE` 保存内参。
+
+注意：
+- 首次标定时如果日志出现 `Camera calibration file ... not found`，这是正常现象，只是说明目标 yaml 还不存在。
+- `cameracalibrator` 启动时看到 `/left`、`/right` 的 warning 也不代表失败；官方工具单目模式下仍会创建双目订阅。
+- 真正需要关注的是 `COMMIT` 后是否成功写入 `camera_info_url` 指定的文件。
+
+## 本次修复说明
+
+此前该 launch 把 `camera:=usb_cam` 传给了 `cameracalibrator`，会导致工具内部访问错误的 `set_camera_info` 服务名，点击 `COMMIT` 后同步调用可能一直卡住。
+
+现在已改为显式将：
+
+- `camera/set_camera_info -> /set_camera_info`
+
+重映射到 `usb_cam` 实际提供的服务，因此单目标定的 `COMMIT` 会走正确的服务路径。
 
 避免 `CALIBRATE` 卡死建议：
 1. 先让 X/Y/Size/Skew 四个进度条基本变绿，再点击 `CALIBRATE`。

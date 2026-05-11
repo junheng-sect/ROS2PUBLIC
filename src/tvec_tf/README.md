@@ -12,7 +12,18 @@
 并发布调试位姿话题：
 - 话题：`/debug/aruco_pose`
 - 类型：`debug_interface/msg/ArucoBasePose`
-- 内容：计算后的 `x/y/z/yaw`
+- 内容：计算后的 `x/y/z/yaw`，以及从 `tvec_rvec_node` 透传下来的 timing 字段
+
+## 时序埋点
+
+`/debug/aruco_pose` 现在会保留：
+
+- `header.stamp`：原始 `/image_raw.header.stamp`
+- 上游 `tvec_*` 时间戳
+- 本级 `tf_cb_start_stamp`
+- 本级 `tf_pub_stamp`
+
+这样控制节点和 CSV logger 可以继续沿用原始图像时间作为基准，同时拆分出第 2 级和第 3 级各自的排队/计算耗时。
 
 ## 一键启动（含图像与 RViz）
 

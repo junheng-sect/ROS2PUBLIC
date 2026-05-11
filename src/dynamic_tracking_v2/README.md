@@ -99,6 +99,38 @@ colcon build --symlink-install --packages-select dynamic_tracking_v2
 source install/setup.bash
 ```
 
+### 最新启动命令
+
+当前最常用的启动命令建议直接用下面这几条：
+
+新相机实机启动：
+
+```bash
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=icspring_1080 \
+  use_rqt:=false
+```
+
+旧相机实机启动：
+
+```bash
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=old_cam \
+  use_rqt:=false
+```
+
+关闭 USB 相机、复用外部图像流：
+
+```bash
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=icspring_1080 \
+  use_usb_cam:=false \
+  use_rqt:=false \
+  ros_image_topic:=/image_raw
+```
+
+如果外部图像来自仿真链路，通常把 `ros_image_topic` 改成 `/camera/image_raw`。
+
 ### 最小启动示例
 
 ```bash
@@ -106,10 +138,31 @@ ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
   use_rqt:=false
 ```
 
+### 相机 profile 切换
+
+`dynamic_tracking_v2.launch.py` 会把 `camera_profile` 继续透传给 `tvec.launch.py`。当前可用 profile：
+
+- `old_cam`
+- `icspring_1080`
+
+示例：
+
+```bash
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=old_cam
+
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=icspring_1080
+```
+
+如果需要新增相机，请到 `src/tvec/config/camera_profiles.yaml` 增加 profile；若只想覆盖单个字段，仍可继续显式传 `video_device`、`image_width`、`image_height`、`pixel_format`、`framerate` 等参数。
+
 ### 最小调参示例
 
 ```bash
 ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=icspring_1080 \
+  publish_annotated_image:=false \
   use_rqt:=false \
   target_x:=0.0 target_y:=0.0 target_z:=2.5 target_yaw:=0.0 \
   kp_xy:=1.00 ki_xy:=0.0 kd_xy:=0.06 \
@@ -118,6 +171,42 @@ ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
   v_limit:=0.8 vz_limit:=0.2 yaw_rate_limit:=0.4 \
   camera_yaw_compensation_deg:=0.0
 ```
+### 800*600
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=icspring_800x600 \
+  publish_annotated_image:=true \
+  use_rqt:=false \
+  target_x:=0.0 target_y:=0.0 target_z:=2.5 target_yaw:=0.0 \
+  kp_xy:=1.00 ki_xy:=0.0 kd_xy:=0.06 \
+  kp_z:=0.5 ki_z:=0.0 kd_z:=0.03 \
+  kp_yaw:=0.4 ki_yaw:=0.0 kd_yaw:=0.03 \
+  v_limit:=0.8 vz_limit:=0.2 yaw_rate_limit:=0.4 \
+  camera_yaw_compensation_deg:=0.0
+
+### 640*480
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=icspring_640x480 \
+  publish_annotated_image:=false \
+  use_rqt:=false \
+  target_x:=0.0 target_y:=0.0 target_z:=1.0 target_yaw:=0.0 \
+  kp_xy:=1.00 ki_xy:=0.0 kd_xy:=0.06 \
+  kp_z:=0.5 ki_z:=0.0 kd_z:=0.03 \
+  kp_yaw:=0.4 ki_yaw:=0.0 kd_yaw:=0.03 \
+  v_limit:=0.8 vz_limit:=0.2 yaw_rate_limit:=0.4 \
+  camera_yaw_compensation_deg:=0.0
+
+### 旧相机
+ros2 launch dynamic_tracking_v2 dynamic_tracking_v2.launch.py \
+  camera_profile:=old_cam \
+  publish_annotated_image:=false \
+  use_rqt:=false \
+  require_offboard:=false \
+  target_x:=0.0 target_y:=0.0 target_z:=2.5 target_yaw:=0.0 \
+  kp_xy:=1.00 ki_xy:=0.0 kd_xy:=0.06 \
+  kp_z:=0.5 ki_z:=0.0 kd_z:=0.03 \
+  kp_yaw:=0.4 ki_yaw:=0.0 kd_yaw:=0.03 \
+  v_limit:=0.8 vz_limit:=0.2 yaw_rate_limit:=0.4 \
+  camera_yaw_compensation_deg:=0.0
 
 ### 分轴 XY 调参示例
 

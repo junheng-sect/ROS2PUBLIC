@@ -12,7 +12,9 @@
   <depend>cv_bridge</depend>
   <depend>aruco_interfaces</depend>
   <depend>debug_interface</depend>
+  <exec_depend>ament_index_python</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>

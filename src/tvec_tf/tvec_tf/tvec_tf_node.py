@@ -74,6 +74,8 @@ class TVecTfNode(Node):
 
     def tvec_callback(self, msg: TVecRVec):
         """按用户定义映射关系发布动态 TF。"""
+        # 记录第 3 级开始处理当前 /debug/tvec 的时刻。
+        tf_cb_start_stamp = self.get_clock().now().to_msg()
         # 由 rvec 计算相对 yaw（ZYX 约定：yaw=atan2(R10,R00)）。
         rvec = np.array(msg.rvec, dtype=np.float64).reshape(3)
         R = self.rodrigues_to_matrix(rvec)
@@ -106,6 +108,13 @@ class TVecTfNode(Node):
         pose_msg = ArucoBasePose()
         pose_msg.header.stamp = msg.header.stamp
         pose_msg.header.frame_id = self.parent_frame
+        pose_msg.tvec_cb_start_stamp = msg.tvec_cb_start_stamp
+        pose_msg.tvec_cv_bridge_done_stamp = msg.tvec_cv_bridge_done_stamp
+        pose_msg.tvec_detect_done_stamp = msg.tvec_detect_done_stamp
+        pose_msg.tvec_pose_done_stamp = msg.tvec_pose_done_stamp
+        pose_msg.tvec_pub_stamp = msg.tvec_pub_stamp
+        pose_msg.tf_cb_start_stamp = tf_cb_start_stamp
+        pose_msg.tf_pub_stamp = self.get_clock().now().to_msg()
         pose_msg.x = tx
         pose_msg.y = ty
         pose_msg.z = tz

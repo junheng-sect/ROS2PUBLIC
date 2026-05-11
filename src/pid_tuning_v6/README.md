@@ -72,6 +72,17 @@ launch 会启动：
 
 - 默认图像话题：`/image_raw`
 - 默认 `use_usb_cam:=true`
+- 默认 `camera_profile:=old_cam`
+
+切换相机 profile：
+
+```bash
+ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
+  camera_profile:=old_cam
+
+ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
+  camera_profile:=icspring_1080
+```
 
 如果后续切回仿真图像流，可手动覆盖：
 
@@ -114,6 +125,8 @@ ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
 - `distance_sensor_timeout_sec`：默认 `0.5`
 - `ros_image_topic`：默认 `/image_raw`
 - `use_usb_cam`：默认 `true`
+- `camera_profile`：默认 `old_cam`
+- `publish_annotated_image`：默认 `true`，设为 `false` 后仅保留位姿解算与 `/debug/tvec`
 - `target_x / target_y / target_z`
 - `kp_xy / ki_xy / kd_xy`
 - `kp_x / ki_x / kd_x`
@@ -125,6 +138,8 @@ ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
 - `require_offboard`
 - `enable_z_hold`
 
+相机 profile 的统一配置文件位于 `src/tvec/config/camera_profiles.yaml`；后续新增相机时优先在该文件追加配置。
+
 ## 构建与运行
 
 ```bash
@@ -133,6 +148,47 @@ cd /home/zjh/project/rasip_pi_ws
 colcon build --symlink-install --packages-select pid_tuning_v6
 source install/setup.bash
 ```
+
+### 最新启动命令
+
+当前最常用的启动命令建议直接用下面这几条：
+
+新相机实机启动：
+
+```bash
+ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
+  camera_profile:=icspring_1080 \
+  use_rqt:=false
+```
+
+旧相机实机启动：
+
+```bash
+ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
+  camera_profile:=old_cam \
+  use_rqt:=false
+```
+
+关闭 USB 相机、复用外部图像流：
+
+```bash
+ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
+  camera_profile:=icspring_1080 \
+  use_usb_cam:=false \
+  use_rqt:=false \
+  ros_image_topic:=/image_raw
+```
+
+仅保留位姿解算，不生成标注图：
+
+```bash
+ros2 launch pid_tuning_v6 pid_tuning_v6.launch.py \
+  camera_profile:=icspring_1080 \
+  publish_annotated_image:=false \
+  use_rqt:=false
+```
+
+如果外部图像来自仿真链路，通常把 `ros_image_topic` 改成 `/camera/image_raw`。
 
 ### 最小启动示例
 

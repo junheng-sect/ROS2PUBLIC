@@ -1,0 +1,76 @@
+# 相机 profile 统一配置文件。
+# 新增相机时，请在 profiles 下追加一个新条目，并保持字段完整。
+default_profile: old_cam
+
+profiles:
+  old_cam:
+    camera_name: narrow_stereo
+    camera_info_url: file:///home/zjh/.ros/camera_info/narrow_stereo.yaml
+    video_device: /dev/video0
+    image_width: 640
+    image_height: 480
+    pixel_format: mjpeg2rgb
+    framerate: 30.0
+    camera_fx: 810.78076
+    camera_fy: 813.75141
+    camera_cx: 346.24076
+    camera_cy: 251.50143
+    dist_k1: -0.410508
+    dist_k2: 0.102062
+    dist_p1: 0.001503
+    dist_p2: -0.000384
+    dist_k3: 0.0
+
+  icspring_1080:
+    camera_name: icspring_cam_1920x1080
+    camera_info_url: file:///home/zjh/.ros/camera_info/icspring_cam_1920x1080.yaml
+    video_device: /dev/video0
+    image_width: 1920
+    image_height: 1080
+    pixel_format: mjpeg2rgb
+    framerate: 30.0
+    camera_fx: 996.6891053895482
+    camera_fy: 993.869274627561
+    camera_cx: 989.9065828025379
+    camera_cy: 542.0077524332429
+    dist_k1: -0.02438368756879708
+    dist_k2: 0.012753235210249216
+    dist_p1: 0.0007143954120557807
+    dist_p2: 0.0021544939262682855
+    dist_k3: 0.0
+
+  icspring_640x480:
+    camera_name: icspring_cam_640x480
+    camera_info_url: file:///home/zjh/.ros/camera_info/icspring_cam_640x480.yaml
+    video_device: /dev/video0
+    image_width: 640
+    image_height: 480
+    pixel_format: mjpeg2rgb
+    framerate: 30.0
+    camera_fx: 444.30783755775576
+    camera_fy: 443.24811640078553
+    camera_cx: 328.11808983543295
+    camera_cy: 237.95215654206763
+    dist_k1: -0.031810469410813259
+    dist_k2: 0.045134857153057886
+    dist_p1: 0.00049801957565448745
+    dist_p2: -0.00049723113380719134
+    dist_k3: 0.0
+
+  icspring_800x600:
+    camera_name: icspring_cam_800x600
+    camera_info_url: file:///home/zjh/.ros/camera_info/icspring_cam_800x600.yaml
+    video_device: /dev/video0
+    image_width: 800
+    image_height: 600
+    pixel_format: mjpeg2rgb
+    framerate: 30.0
+    camera_fx: 555.4261015596901
+    camera_fy: 555.51513190738012
+    camera_cx: 407.71560746892845
+    camera_cy: 293.32546300756974
+    dist_k1: -0.025329525997286776
+    dist_k2: 0.037124480914215476
+    dist_p1: 0.0015810190153126842
+    dist_p2: -0.0017643893676816899
+    dist_k3: 0.0

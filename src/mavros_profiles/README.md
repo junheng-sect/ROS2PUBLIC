@@ -21,7 +21,10 @@
 - `/mavros/global_position/rel_alt`
 - `/mavros/altitude`
 - `/mavros/distance_sensor/*`
+- `/mavros/esc_status/status`
+- `/mavros/esc_telemetry/telemetry`
 - `/mavros/home_position/home`
+- `/mavros/rc/out`
 - `/mavros/setpoint_velocity/cmd_vel`
 - `/mavros/setpoint_raw/local`
 - `/mavros/cmd/arming`
@@ -35,7 +38,10 @@
 - `global_position`
 - `altitude`
 - `distance_sensor`
+- `esc_status`
+- `esc_telemetry`
 - `home_position`
+- `rc_io`
 - `setpoint_velocity`
 - `setpoint_raw`
 
@@ -93,6 +99,7 @@ ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
 - `body_frame_tracking`
 - `body_frame_tracking_minimal`
 - `landing`
+- `altitude_descent`
 - `land_with_tracking`
 - `return_home`
 - `return_track_hover`
@@ -104,6 +111,7 @@ ros2 launch mavros_profiles workspace_minimal_px4.launch.py \
 
 - 本包只裁剪 MAVROS 插件，不会修改任何现有 tracking/landing/return 功能包。
 - 如果后续新增功能包开始依赖新的 MAVROS 话题或服务，需要同步更新 `config/workspace_minimal_pluginlists.yaml`。
+- `esc_status` / `esc_telemetry` 是否真正输出 RPM 取决于飞控、电调和 MAVLink 消息配置；没有 RPM 时，可用 `/mavros/rc/out` 的 PWM 作为油门等效观测量。
 - 若需要完整插件集，仍可继续使用系统自带的：
 
 ```bash

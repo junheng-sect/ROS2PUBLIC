@@ -19,8 +19,14 @@
       - 'altitude'
       # /mavros/distance_sensor/*
       - 'distance_sensor'
+      # /mavros/esc_status/status
+      - 'esc_status'
+      # /mavros/esc_telemetry/telemetry
+      - 'esc_telemetry'
       # /mavros/home_position/home
       - 'home_position'
+      # /mavros/rc/out
+      - 'rc_io'
       # /mavros/setpoint_velocity/cmd_vel
       - 'setpoint_velocity'
       # /mavros/setpoint_raw/local

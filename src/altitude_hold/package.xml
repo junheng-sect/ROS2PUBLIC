@@ -1,16 +1,18 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mavros_profiles</name>
+  <name>altitude_hold</name>
   <version>0.0.0</version>
-  <description>MAVROS minimal launch profiles for this workspace.</description>
+  <description>Range-sensor altitude hold controller with MAVROS motor signal logging</description>
   <maintainer email="junhengsect+1647307223@qq.com">zjh</maintainer>
   <license>Apache-2.0</license>
 
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
-  <exec_depend>mavros</exec_depend>
-  <exec_depend>mavros_extras</exec_depend>
+  <depend>rclpy</depend>
+  <depend>mavros_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>launch</depend>
+  <depend>launch_ros</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
